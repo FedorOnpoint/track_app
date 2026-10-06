@@ -49,7 +49,7 @@
 
 ## Этап 5 — основной frontend flow
 
-- [ ] T18 App shell/router/API client/QueryClient. Acceptance: typed envelopes, abortable requests, global 401 and safe error mapping. Verify: unit/component tests + production build. Depends: T10,T17. Scope: M.
+- [x] T18 App shell/router/API client/QueryClient. Acceptance: typed envelopes, abortable requests, global 401 and safe error mapping. Verify: unit/component tests + production build. Depends: T10,T17. Scope: M.
 - [ ] T19 Login и protected routes. Acceptance: accessible form, generic error, redirect after success/401. Verify: RTL tests. Depends: T18. Scope: M.
 - [ ] T20 Dashboard page. Acceptance: progress/category/review/recent/continue states render for loading/error/empty/success. Verify: RTL tests. Depends: T18,T16. Scope: M.
 - [ ] T21 Knowledge Map. Acceptance: search/filter/page state synchronized with URL and resettable. Verify: RTL router tests. Depends: T18,T06. Scope: M.

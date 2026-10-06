@@ -1,16 +1,13 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react'
 
+import { ApiError, apiRequest, isAbortError, unauthorizedEvent } from './shared/api/client'
+import type { ApiEnvelope, PaginatedEnvelope } from './shared/api/types'
+
 type Category = { id: string; slug: string; title: string; description: string }
 type Topic = { id: string; slug: string; title: string; summary: string; difficulty: 'basic' | 'intermediate' | 'advanced'; estimated_minutes: number; category_slug: string; category_title: string }
 type Pagination = { page: number; page_size: number; total_items: number; total_pages: number }
 type User = { id: string; login: string }
 const difficultyLabel = { basic: 'База', intermediate: 'Middle', advanced: 'Продвинутая' }
-
-async function getJSON<T>(url: string, signal: AbortSignal): Promise<T> {
-  const response = await fetch(url, { signal })
-  if (!response.ok) throw new Error(`request failed: ${response.status}`)
-  return response.json() as Promise<T>
-}
 
 export function App() {
 	const [user, setUser] = useState<User | null | undefined>(undefined)
@@ -29,12 +26,17 @@ export function App() {
   const [error, setError] = useState(false)
 
 	useEffect(() => {
+		const handleUnauthorized = () => setUser(null)
+		window.addEventListener(unauthorizedEvent, handleUnauthorized)
+		return () => window.removeEventListener(unauthorizedEvent, handleUnauthorized)
+	}, [])
+
+	useEffect(() => {
 		const controller = new AbortController()
-		fetch('/api/v1/auth/me', { signal: controller.signal }).then(async (response) => {
-			if (!response.ok) { setUser(null); return }
-			const body = await response.json() as { data: User }; setUser(body.data)
+		apiRequest<ApiEnvelope<User>>('/auth/me', { signal: controller.signal }).then((body) => {
+			setUser(body.data)
 		}).catch((requestError: unknown) => {
-			if (!(requestError instanceof DOMException && requestError.name === 'AbortError')) setUser(null)
+			if (!isAbortError(requestError)) setUser(null)
 		})
 		return () => controller.abort()
 	}, [])
@@ -46,8 +48,8 @@ export function App() {
     if (difficulty) params.set('difficulty', difficulty)
     if (query) params.set('query', query)
     return Promise.all([
-      getJSON<{ data: Category[] }>('/api/v1/categories', signal),
-      getJSON<{ data: Topic[]; pagination: Pagination }>(`/api/v1/topics?${params}`, signal),
+      apiRequest<ApiEnvelope<Category[]>>('/categories', { signal }),
+      apiRequest<PaginatedEnvelope<Topic>>(`/topics?${params}`, { signal }),
     ]).then(([categoryResponse, topicResponse]) => {
       setCategories(categoryResponse.data); setTopics(topicResponse.data); setPagination(topicResponse.pagination)
     }).catch((requestError: unknown) => {
@@ -65,12 +67,11 @@ export function App() {
 	async function submitLogin(event: FormEvent) {
 		event.preventDefault(); setLoginPending(true); setLoginError(false)
 		try {
-			const response = await fetch('/api/v1/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login, password }) })
-			if (!response.ok) { setLoginError(true); return }
-			const body = await response.json() as { data: User }; setUser(body.data); setPassword('')
+			const body = await apiRequest<ApiEnvelope<User>>('/auth/login', { method: 'POST', body: JSON.stringify({ login, password }) })
+			setUser(body.data); setPassword('')
 		} catch { setLoginError(true) } finally { setLoginPending(false) }
 	}
-	async function logout() { await fetch('/api/v1/auth/logout', { method: 'POST' }); setUser(null) }
+	async function logout() { try { await apiRequest<void>('/auth/logout', { method: 'POST' }) } catch (error) { if (!(error instanceof ApiError)) throw error } finally { setUser(null) } }
   const totalMinutes = topics.reduce((sum, topic) => sum + topic.estimated_minutes, 0)
 
 	if (user === undefined) return <div className="auth-loading"><span className="loader" /><span>Проверяем сессию…</span></div>

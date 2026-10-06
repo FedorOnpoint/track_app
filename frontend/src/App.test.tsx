@@ -51,3 +51,17 @@ test('authenticates before opening the protected catalog', async () => {
   await waitFor(() => expect(screen.getByRole('heading', { name: 'Карта знаний' })).toBeInTheDocument())
   expect(fetchMock).toHaveBeenCalledWith('/api/v1/auth/login', expect.objectContaining({ method: 'POST' }))
 })
+
+test('returns to login when any API request receives a 401', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input)
+    if (url.includes('/auth/me')) return new Response(JSON.stringify({ data: { id: 'u1', login: 'fedor' } }))
+    return new Response(JSON.stringify({
+      error: { code: 'unauthorized', message: 'Требуется вход', request_id: 'request-1' },
+    }), { status: 401 })
+  }))
+
+  render(<App />)
+
+  await waitFor(() => expect(screen.getByRole('heading', { name: 'С возвращением' })).toBeInTheDocument())
+})
