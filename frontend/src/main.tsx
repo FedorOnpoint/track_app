@@ -1,11 +1,8 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
+import { App } from './App'
 import './styles.css'
-
-function App() {
-  return <main>Go Middle Interview Tracker</main>
-}
 
 const root = document.getElementById('root')
 
