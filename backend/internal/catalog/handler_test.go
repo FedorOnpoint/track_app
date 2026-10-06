@@ -22,6 +22,21 @@ type fakeStore struct {
 	found      bool
 }
 
+type fakePersonalizedStore struct {
+	params UserTopicParams
+	rows   []UserTopic
+	total  int64
+}
+
+func (store *fakePersonalizedStore) CountUserTopics(_ context.Context, params UserTopicParams) (int64, error) {
+	store.params = params
+	return store.total, nil
+}
+func (store *fakePersonalizedStore) ListUserTopics(_ context.Context, params UserTopicParams) ([]UserTopic, error) {
+	store.params = params
+	return store.rows, nil
+}
+
 type recordingVisit struct {
 	userID uuid.UUID
 	slug   string
@@ -166,5 +181,54 @@ func TestListTopicsReturnsEnvelope(t *testing.T) {
 	}
 	if len(body.Data) != 1 || body.Data[0].Slug != "goroutines" || body.Pagination.TotalItems != 1 {
 		t.Fatalf("body = %#v", body)
+	}
+}
+
+func TestPersonalizedTopicsValidateAndForwardFilters(t *testing.T) {
+	userID := uuid.New()
+	personalized := &fakePersonalizedStore{total: 1, rows: []UserTopic{{ID: uuid.New(), Slug: "goroutines", Status: "review", ReviewRequired: true, Bookmarked: true}}}
+	router := chi.NewRouter()
+	MountRoutesWithUserData(router, &fakeStore{}, nil, personalized)
+	request := httptest.NewRequest(http.MethodGet, "/topics?status=review&bookmarked=true&review_required=true&page=2&page_size=10&sort=title", nil)
+	request = request.WithContext(auth.ContextWithUserID(request.Context(), userID))
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if personalized.params.UserID != userID || personalized.params.Status == nil || *personalized.params.Status != "review" || personalized.params.Bookmarked == nil || !*personalized.params.Bookmarked || personalized.params.PageOffset != 10 {
+		t.Fatalf("params=%+v", personalized.params)
+	}
+	for _, fragment := range []string{`"status":"review"`, `"review_required":true`, `"bookmarked":true`} {
+		if !strings.Contains(response.Body.String(), fragment) {
+			t.Errorf("missing %s: %s", fragment, response.Body.String())
+		}
+	}
+}
+
+func TestReviewForcesReviewFilter(t *testing.T) {
+	personalized := &fakePersonalizedStore{}
+	router := chi.NewRouter()
+	MountRoutesWithUserData(router, &fakeStore{}, nil, personalized)
+	request := httptest.NewRequest(http.MethodGet, "/review", nil)
+	request = request.WithContext(auth.ContextWithUserID(request.Context(), uuid.New()))
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || personalized.params.ReviewRequired == nil || !*personalized.params.ReviewRequired {
+		t.Fatalf("status=%d params=%+v", response.Code, personalized.params)
+	}
+}
+
+func TestPersonalizedFiltersRejectInvalidValues(t *testing.T) {
+	for _, path := range []string{"/topics?status=unknown", "/topics?bookmarked=maybe", "/topics?review_required=1", "/topics?query=" + strings.Repeat("я", 201)} {
+		router := chi.NewRouter()
+		MountRoutesWithUserData(router, &fakeStore{}, nil, &fakePersonalizedStore{})
+		request := httptest.NewRequest(http.MethodGet, path, nil)
+		request = request.WithContext(auth.ContextWithUserID(request.Context(), uuid.New()))
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, request)
+		if response.Code != http.StatusBadRequest {
+			t.Fatalf("%s status=%d", path, response.Code)
+		}
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"math"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -59,6 +60,9 @@ type topicSummaryDTO struct {
 	EstimatedMinutes int32  `json:"estimated_minutes"`
 	CategorySlug     string `json:"category_slug"`
 	CategoryTitle    string `json:"category_title"`
+	Status           string `json:"status,omitempty"`
+	ReviewRequired   bool   `json:"review_required,omitempty"`
+	Bookmarked       bool   `json:"bookmarked,omitempty"`
 }
 
 func MountRoutes(router chi.Router, store Store, recorders ...TopicVisitRecorder) {
@@ -66,8 +70,21 @@ func MountRoutes(router chi.Router, store Store, recorders ...TopicVisitRecorder
 	if len(recorders) > 0 {
 		recorder = recorders[0]
 	}
+	mountRoutes(router, store, recorder, nil)
+}
+
+func MountRoutesWithUserData(router chi.Router, store Store, recorder TopicVisitRecorder, personalized PersonalizedStore) {
+	mountRoutes(router, store, recorder, personalized)
+}
+
+func mountRoutes(router chi.Router, store Store, recorder TopicVisitRecorder, personalized PersonalizedStore) {
 	router.Get("/categories", listCategories(store))
-	router.Get("/topics", listTopics(store))
+	if personalized == nil {
+		router.Get("/topics", listTopics(store))
+	} else {
+		router.Get("/topics", listUserTopics(personalized, false))
+		router.Get("/review", listUserTopics(personalized, true))
+	}
 	router.Get("/topics/{slug}", getTopic(store, recorder))
 }
 
@@ -235,6 +252,113 @@ func listTopics(store Store) http.HandlerFunc {
 			"pagination": map[string]any{"page": page, "page_size": pageSize, "total_items": total, "total_pages": totalPages},
 		})
 	}
+}
+
+func listUserTopics(store PersonalizedStore, reviewOnly bool) http.HandlerFunc {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		userID, ok := auth.UserIDFromContext(request.Context())
+		if !ok {
+			writeCatalogError(writer, request, http.StatusUnauthorized, "unauthorized", "Требуется вход")
+			return
+		}
+		params, page, pageSize, ok := parseUserListParams(writer, request)
+		if !ok {
+			return
+		}
+		params.UserID = userID
+		if reviewOnly {
+			value := true
+			params.ReviewRequired = &value
+		}
+		total, err := store.CountUserTopics(request.Context(), params)
+		if err != nil {
+			writeCatalogError(writer, request, http.StatusInternalServerError, "internal_error", "Не удалось загрузить темы")
+			return
+		}
+		rows, err := store.ListUserTopics(request.Context(), params)
+		if err != nil {
+			writeCatalogError(writer, request, http.StatusInternalServerError, "internal_error", "Не удалось загрузить темы")
+			return
+		}
+		data := make([]topicSummaryDTO, 0, len(rows))
+		for _, row := range rows {
+			data = append(data, topicSummaryDTO{ID: row.ID.String(), Slug: row.Slug, Title: row.Title, Summary: row.Summary, Difficulty: row.Difficulty, EstimatedMinutes: row.EstimatedMinutes, CategorySlug: row.CategorySlug, CategoryTitle: row.CategoryTitle, Status: row.Status, ReviewRequired: row.ReviewRequired, Bookmarked: row.Bookmarked})
+		}
+		totalPages := int64(0)
+		if total > 0 {
+			totalPages = int64(math.Ceil(float64(total) / float64(pageSize)))
+		}
+		writeCatalogJSON(writer, http.StatusOK, map[string]any{"data": data, "pagination": map[string]any{"page": page, "page_size": pageSize, "total_items": total, "total_pages": totalPages}})
+	}
+}
+
+func parseUserListParams(writer http.ResponseWriter, request *http.Request) (UserTopicParams, int, int, bool) {
+	query := request.URL.Query()
+	page, ok := positiveInt(query.Get("page"), 1)
+	if !ok {
+		writeCatalogError(writer, request, http.StatusBadRequest, "validation_error", "Некорректный номер страницы")
+		return UserTopicParams{}, 0, 0, false
+	}
+	pageSize, ok := positiveInt(query.Get("page_size"), 20)
+	if !ok || pageSize > 100 {
+		writeCatalogError(writer, request, http.StatusBadRequest, "validation_error", "Размер страницы должен быть от 1 до 100")
+		return UserTopicParams{}, 0, 0, false
+	}
+	search := strings.TrimSpace(query.Get("query"))
+	if len([]rune(search)) > 200 {
+		writeCatalogError(writer, request, http.StatusBadRequest, "validation_error", "Поисковый запрос слишком длинный")
+		return UserTopicParams{}, 0, 0, false
+	}
+	difficulty := strings.TrimSpace(query.Get("difficulty"))
+	if difficulty != "" && difficulty != "basic" && difficulty != "intermediate" && difficulty != "advanced" {
+		writeCatalogError(writer, request, http.StatusBadRequest, "validation_error", "Неизвестная сложность")
+		return UserTopicParams{}, 0, 0, false
+	}
+	status := strings.TrimSpace(query.Get("status"))
+	if status != "" && !validProgressStatus(status) {
+		writeCatalogError(writer, request, http.StatusBadRequest, "validation_error", "Неизвестный статус")
+		return UserTopicParams{}, 0, 0, false
+	}
+	bookmarked, ok := optionalBool(query, "bookmarked")
+	if !ok {
+		writeCatalogError(writer, request, http.StatusBadRequest, "validation_error", "Некорректный фильтр закладок")
+		return UserTopicParams{}, 0, 0, false
+	}
+	review, ok := optionalBool(query, "review_required")
+	if !ok {
+		writeCatalogError(writer, request, http.StatusBadRequest, "validation_error", "Некорректный фильтр повторения")
+		return UserTopicParams{}, 0, 0, false
+	}
+	sort := query.Get("sort")
+	if sort == "" {
+		sort = "category"
+	}
+	if sort != "category" && sort != "title" && sort != "difficulty" {
+		writeCatalogError(writer, request, http.StatusBadRequest, "validation_error", "Неизвестная сортировка")
+		return UserTopicParams{}, 0, 0, false
+	}
+	return UserTopicParams{Query: stringPointer(search), Category: stringPointer(strings.TrimSpace(query.Get("category"))), Difficulty: stringPointer(difficulty), Status: stringPointer(status), Bookmarked: bookmarked, ReviewRequired: review, Sort: sort, PageSize: int32(pageSize), PageOffset: int32((page - 1) * pageSize)}, page, pageSize, true
+}
+
+func optionalBool(values url.Values, key string) (*bool, bool) {
+	if !values.Has(key) {
+		return nil, true
+	}
+	raw := values.Get(key)
+	if raw != "true" && raw != "false" {
+		return nil, false
+	}
+	value := raw == "true"
+	return &value, true
+}
+func stringPointer(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+func validProgressStatus(value string) bool {
+	return value == "not_started" || value == "learning" || value == "review" || value == "mastered"
 }
 
 func parseListParams(writer http.ResponseWriter, request *http.Request) (catalogdb.ListTopicsParams, int, int, bool) {

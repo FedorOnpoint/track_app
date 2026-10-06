@@ -41,11 +41,11 @@
 - [x] T14 Bookmarks migration и API. Acceptance: set/delete idempotent, list filtered to current user. Verify: integration tests. Depends: T10,T07. Scope: M.
 - [x] T15 Notes migration и CRUD API. Acceptance: ownership enforced in SQL predicates; body bounded; 404 avoids existence disclosure. Verify: two-user integration tests. Depends: T10,T07. Scope: M.
 - [x] T16 Dashboard aggregates и last-opened. Acceptance: empty/full category math correct, recent items deterministic. Verify: aggregate integration tests. Depends: T13,T15. Scope: M.
-- [ ] T17 Review и track-list read models. Acceptance: filters/search/pagination follow shared contract. Verify: integration contract tests. Depends: T13,T14. Scope: M.
+- [x] T17 Review и track-list read models. Acceptance: filters/search/pagination follow shared contract. Verify: integration contract tests. Depends: T13,T14. Scope: M.
 
 ### Checkpoint D
 
-- [ ] Persistent user flow доказан после restart; ownership, aggregate и concurrency tests проходят; пользователь одобрил frontend.
+- [x] Persistent user flow доказан после restart; ownership, aggregate и concurrency tests проходят; пользователь одобрил frontend.
 
 ## Этап 5 — основной frontend flow
 

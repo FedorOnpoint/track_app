@@ -60,7 +60,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		authHandler.Mount(router)
 		router.Group(func(protected chi.Router) {
 			protected.Use(authHandler.Require)
-			catalog.MountRoutes(protected, catalogQueries, progressStore)
+			catalog.MountRoutesWithUserData(protected, catalogQueries, progressStore, catalog.NewPostgresPersonalizedStore(pool))
 			progress.MountRoutes(protected, progressStore)
 			bookmarks.MountRoutes(protected, bookmarks.NewPostgresStore(pool))
 			notes.MountRoutes(protected, notes.NewPostgresStore(pool))
