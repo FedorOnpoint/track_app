@@ -1,7 +1,16 @@
 GO ?= GOTOOLCHAIN=go1.27.1 go
 NODE_RUN ?= npx --yes --package=node@22.22.0 -c
 
-.PHONY: test test-backend test-frontend lint build build-backend build-frontend
+.PHONY: dev stop compose-config test test-backend test-frontend lint build build-backend build-frontend
+
+dev:
+	docker compose --env-file .env -f deploy/compose.development.yml up -d
+
+stop:
+	docker compose --env-file .env -f deploy/compose.development.yml down
+
+compose-config:
+	POSTGRES_PASSWORD=validation-only docker compose -f deploy/compose.development.yml config --quiet
 
 test: test-backend test-frontend
 
