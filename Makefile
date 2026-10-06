@@ -18,7 +18,7 @@ lint:
 build: build-backend build-frontend
 
 build-backend:
-	docker run --rm -v "$(CURDIR)/backend:/app" -w /app $(GO_IMAGE) go build ./cmd/api
+	docker run --rm -v "$(CURDIR)/backend:/app" -w /app $(GO_IMAGE) go build -o /tmp/track-app-api ./cmd/api
 
 build-frontend:
 	docker run --rm -v "$(CURDIR)/frontend:/app" -w /app $(NODE_IMAGE) sh -c "npm ci --cache /tmp/npm-cache && npm run build"

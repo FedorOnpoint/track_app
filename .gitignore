@@ -12,6 +12,10 @@ dist/
 coverage/
 bin/
 *.test
+*.tsbuildinfo
+backend/api
+frontend/vite.config.js
+frontend/vite.config.d.ts
 
 # Editor and OS files
 .DS_Store
