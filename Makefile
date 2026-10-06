@@ -1,24 +1,25 @@
-GO_IMAGE ?= golang:1.27.1
-NODE_IMAGE ?= node:22-alpine
+GO ?= GOTOOLCHAIN=go1.27.1 go
+NODE_RUN ?= npx --yes --package=node@22.22.0 -c
 
 .PHONY: test test-backend test-frontend lint build build-backend build-frontend
 
 test: test-backend test-frontend
 
 test-backend:
-	docker run --rm -v "$(CURDIR)/backend:/app" -w /app $(GO_IMAGE) go test ./...
+	cd backend && $(GO) test ./...
 
 test-frontend:
-	docker run --rm -v "$(CURDIR)/frontend:/app" -w /app $(NODE_IMAGE) sh -c "npm ci --cache /tmp/npm-cache && npm test"
+	cd frontend && $(NODE_RUN) 'npm ci --ignore-scripts && npm test'
 
 lint:
-	docker run --rm -v "$(CURDIR)/backend:/app" -w /app $(GO_IMAGE) sh -c "test -z \"$$(gofmt -l .)\" && go vet ./..."
-	docker run --rm -v "$(CURDIR)/frontend:/app" -w /app $(NODE_IMAGE) sh -c "npm ci --cache /tmp/npm-cache && npm run lint && npm run typecheck"
+	test -z "$$(gofmt -l backend)"
+	cd backend && $(GO) vet ./...
+	cd frontend && $(NODE_RUN) 'npm ci --ignore-scripts && npm run lint && npm run typecheck'
 
 build: build-backend build-frontend
 
 build-backend:
-	docker run --rm -v "$(CURDIR)/backend:/app" -w /app $(GO_IMAGE) go build -o /tmp/track-app-api ./cmd/api
+	cd backend && $(GO) build -o /tmp/track-app-api ./cmd/api
 
 build-frontend:
-	docker run --rm -v "$(CURDIR)/frontend:/app" -w /app $(NODE_IMAGE) sh -c "npm ci --cache /tmp/npm-cache && npm run build"
+	cd frontend && $(NODE_RUN) 'npm ci --ignore-scripts && npm run build'
