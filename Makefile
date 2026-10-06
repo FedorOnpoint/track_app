@@ -1,7 +1,7 @@
 GO ?= GOTOOLCHAIN=go1.27.1 go
 NODE_RUN ?= npx --yes --package=node@22.22.0 -c
 
-.PHONY: dev stop compose-config test test-backend test-frontend lint build build-backend build-frontend
+.PHONY: dev stop compose-config test test-backend test-integration test-frontend lint build build-backend build-frontend
 
 dev:
 	docker compose --env-file .env -f deploy/compose.development.yml up -d
@@ -16,6 +16,9 @@ test: test-backend test-frontend
 
 test-backend:
 	cd backend && $(GO) test ./...
+
+test-integration:
+	cd backend && $(GO) test -tags=integration ./...
 
 test-frontend:
 	cd frontend && $(NODE_RUN) 'npm ci --ignore-scripts && npm test'
