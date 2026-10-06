@@ -69,7 +69,24 @@ func TestPersonalizedTopicFiltersAndSearch(t *testing.T) {
 	if err := bookmarks.NewPostgresStore(pool).Set(ctx, strangerID, "context", now); err != nil {
 		t.Fatal(err)
 	}
+	if err := bookmarks.NewPostgresStore(pool).Set(ctx, strangerID, "goroutines", now); err != nil {
+		t.Fatal(err)
+	}
+	var checklistItemID uuid.UUID
+	if err := pool.QueryRow(ctx, `SELECT i.id FROM checklist_items i JOIN topics t ON t.id=i.topic_id WHERE t.slug='goroutines' ORDER BY i.sort_order LIMIT 1`).Scan(&checklistItemID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := progress.NewPostgresStore(pool).SetChecklistProgress(ctx, userID, "goroutines", checklistItemID, true, now); err != nil {
+		t.Fatal(err)
+	}
 	store := catalog.NewPostgresPersonalizedStore(pool)
+	state, err := store.GetTopicState(ctx, userID, "goroutines")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.Status != "review" || !state.ReviewRequired || state.Bookmarked || !state.Checklist[checklistItemID] {
+		t.Fatalf("topic state=%+v", state)
+	}
 	truth := true
 	bookmarked, err := store.ListUserTopics(ctx, catalog.UserTopicParams{UserID: userID, Bookmarked: &truth, Sort: "title", PageSize: 20})
 	if err != nil {

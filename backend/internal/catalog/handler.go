@@ -70,14 +70,14 @@ func MountRoutes(router chi.Router, store Store, recorders ...TopicVisitRecorder
 	if len(recorders) > 0 {
 		recorder = recorders[0]
 	}
-	mountRoutes(router, store, recorder, nil)
+	mountRoutes(router, store, recorder, nil, nil)
 }
 
-func MountRoutesWithUserData(router chi.Router, store Store, recorder TopicVisitRecorder, personalized PersonalizedStore) {
-	mountRoutes(router, store, recorder, personalized)
+func MountRoutesWithUserData(router chi.Router, store Store, recorder TopicVisitRecorder, personalized PersonalizedStore, stateStore UserTopicStateStore) {
+	mountRoutes(router, store, recorder, personalized, stateStore)
 }
 
-func mountRoutes(router chi.Router, store Store, recorder TopicVisitRecorder, personalized PersonalizedStore) {
+func mountRoutes(router chi.Router, store Store, recorder TopicVisitRecorder, personalized PersonalizedStore, stateStore UserTopicStateStore) {
 	router.Get("/categories", listCategories(store))
 	if personalized == nil {
 		router.Get("/topics", listTopics(store))
@@ -85,10 +85,10 @@ func mountRoutes(router chi.Router, store Store, recorder TopicVisitRecorder, pe
 		router.Get("/topics", listUserTopics(personalized, false))
 		router.Get("/review", listUserTopics(personalized, true))
 	}
-	router.Get("/topics/{slug}", getTopic(store, recorder))
+	router.Get("/topics/{slug}", getTopic(store, recorder, stateStore))
 }
 
-func getTopic(store Store, recorder TopicVisitRecorder) http.HandlerFunc {
+func getTopic(store Store, recorder TopicVisitRecorder, stateStore UserTopicStateStore) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		row, err := store.GetTopic(request.Context(), chi.URLParam(request, "slug"))
 		if err != nil {
@@ -110,13 +110,26 @@ func getTopic(store Store, recorder TopicVisitRecorder) http.HandlerFunc {
 			writeCatalogError(writer, request, http.StatusInternalServerError, "internal_error", "Не удалось загрузить тему")
 			return
 		}
-		writeCatalogJSON(writer, http.StatusOK, map[string]any{"data": map[string]any{
+		data := map[string]any{
 			"id": uuidString(row.ID), "slug": row.Slug, "title": row.Title, "summary": row.Summary,
 			"difficulty": row.Difficulty, "estimated_minutes": row.EstimatedMinutes,
 			"category_slug": row.CategorySlug, "category_title": row.CategoryTitle,
 			"sections": sectionDTOs(sections), "checklist": checklistDTOs(checklist), "questions": questionDTOs(questions),
 			"follow_ups": followUpDTOs(followUps), "resources": resourceDTOs(resources), "practice": practiceDTOs(practice),
-		}})
+		}
+		if userID, ok := auth.UserIDFromContext(request.Context()); ok && stateStore != nil {
+			state, err := stateStore.GetTopicState(request.Context(), userID, row.Slug)
+			if err != nil {
+				writeCatalogError(writer, request, http.StatusInternalServerError, "internal_error", "Не удалось загрузить состояние темы")
+				return
+			}
+			checklist := make(map[string]bool, len(state.Checklist))
+			for itemID, completed := range state.Checklist {
+				checklist[itemID.String()] = completed
+			}
+			data["user_state"] = map[string]any{"status": state.Status, "review_required": state.ReviewRequired, "bookmarked": state.Bookmarked, "checklist": checklist}
+		}
+		writeCatalogJSON(writer, http.StatusOK, map[string]any{"data": data})
 	}
 }
 

@@ -42,6 +42,14 @@ type recordingVisit struct {
 	slug   string
 }
 
+type fakeTopicStateStore struct {
+	state UserTopicState
+}
+
+func (store *fakeTopicStateStore) GetTopicState(context.Context, uuid.UUID, string) (UserTopicState, error) {
+	return store.state, nil
+}
+
 func (visit *recordingVisit) RecordTopicVisit(_ context.Context, userID uuid.UUID, slug string, _ time.Time) error {
 	visit.userID = userID
 	visit.slug = slug
@@ -153,6 +161,26 @@ func TestTopicDetailRecordsAuthenticatedVisit(t *testing.T) {
 	}
 }
 
+func TestTopicDetailContainsAuthenticatedUserState(t *testing.T) {
+	itemID := uuid.New()
+	router := chi.NewRouter()
+	MountRoutesWithUserData(router, &fakeStore{found: true}, nil, &fakePersonalizedStore{}, &fakeTopicStateStore{state: UserTopicState{
+		Status: "learning", ReviewRequired: true, Bookmarked: true, Checklist: map[uuid.UUID]bool{itemID: true},
+	}})
+	request := httptest.NewRequest(http.MethodGet, "/topics/goroutines", nil)
+	request = request.WithContext(auth.ContextWithUserID(request.Context(), uuid.New()))
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	for _, fragment := range []string{`"status":"learning"`, `"review_required":true`, `"bookmarked":true`, `"` + itemID.String() + `":true`} {
+		if !strings.Contains(response.Body.String(), fragment) {
+			t.Errorf("response missing %s: %s", fragment, response.Body.String())
+		}
+	}
+}
+
 func TestListTopicsReturnsEnvelope(t *testing.T) {
 	store := &fakeStore{}
 	router := chi.NewRouter()
@@ -188,7 +216,7 @@ func TestPersonalizedTopicsValidateAndForwardFilters(t *testing.T) {
 	userID := uuid.New()
 	personalized := &fakePersonalizedStore{total: 1, rows: []UserTopic{{ID: uuid.New(), Slug: "goroutines", Status: "review", ReviewRequired: true, Bookmarked: true}}}
 	router := chi.NewRouter()
-	MountRoutesWithUserData(router, &fakeStore{}, nil, personalized)
+	MountRoutesWithUserData(router, &fakeStore{}, nil, personalized, nil)
 	request := httptest.NewRequest(http.MethodGet, "/topics?status=review&bookmarked=true&review_required=true&page=2&page_size=10&sort=title", nil)
 	request = request.WithContext(auth.ContextWithUserID(request.Context(), userID))
 	response := httptest.NewRecorder()
@@ -209,7 +237,7 @@ func TestPersonalizedTopicsValidateAndForwardFilters(t *testing.T) {
 func TestReviewForcesReviewFilter(t *testing.T) {
 	personalized := &fakePersonalizedStore{}
 	router := chi.NewRouter()
-	MountRoutesWithUserData(router, &fakeStore{}, nil, personalized)
+	MountRoutesWithUserData(router, &fakeStore{}, nil, personalized, nil)
 	request := httptest.NewRequest(http.MethodGet, "/review", nil)
 	request = request.WithContext(auth.ContextWithUserID(request.Context(), uuid.New()))
 	response := httptest.NewRecorder()
@@ -222,7 +250,7 @@ func TestReviewForcesReviewFilter(t *testing.T) {
 func TestPersonalizedFiltersRejectInvalidValues(t *testing.T) {
 	for _, path := range []string{"/topics?status=unknown", "/topics?bookmarked=maybe", "/topics?review_required=1", "/topics?query=" + strings.Repeat("я", 201)} {
 		router := chi.NewRouter()
-		MountRoutesWithUserData(router, &fakeStore{}, nil, &fakePersonalizedStore{})
+		MountRoutesWithUserData(router, &fakeStore{}, nil, &fakePersonalizedStore{}, nil)
 		request := httptest.NewRequest(http.MethodGet, path, nil)
 		request = request.WithContext(auth.ContextWithUserID(request.Context(), uuid.New()))
 		response := httptest.NewRecorder()

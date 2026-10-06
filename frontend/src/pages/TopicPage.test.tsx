@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createMemoryRouter } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
 import { afterEach, expect, test, vi } from 'vitest'
@@ -54,6 +54,82 @@ test('renders a safe retryable topic error', async () => {
   expect(screen.getByRole('button', { name: 'Повторить' })).toBeInTheDocument()
 })
 
+test('prevents duplicate progress submissions while a mutation is pending', async () => {
+  const pending = deferred<Response>()
+  const progressRequests: RequestInit[] = []
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    if (url.includes('/auth/me')) return sessionResponse()
+    if (url.endsWith('/topics/goroutines')) return new Response(JSON.stringify({ data: topicFixture() }))
+    if (url.endsWith('/progress')) {
+      progressRequests.push(init ?? {})
+      return pending.promise
+    }
+    return new Response(null, { status: 204 })
+  }))
+  renderTopic()
+  await screen.findByRole('heading', { name: 'Горутины' })
+
+  fireEvent.change(screen.getByLabelText('Статус'), { target: { value: 'learning' } })
+  fireEvent.click(screen.getByLabelText('Требует повторения'))
+  const save = screen.getByRole('button', { name: 'Сохранить прогресс' })
+  fireEvent.click(save)
+  fireEvent.click(save)
+
+  expect(await screen.findByRole('button', { name: 'Сохраняем…' })).toBeDisabled()
+  expect(progressRequests).toHaveLength(1)
+  expect(progressRequests[0]).toMatchObject({ method: 'PUT', body: JSON.stringify({ status: 'learning', review_required: true }) })
+  pending.resolve(new Response(JSON.stringify({ data: {} })))
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Сохранить прогресс' })).toBeEnabled())
+})
+
+test('optimistically updates and exactly restores a bookmark after failure', async () => {
+  const pending = deferred<Response>()
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input)
+    if (url.includes('/auth/me')) return sessionResponse()
+    if (url.endsWith('/topics/goroutines')) return new Response(JSON.stringify({ data: topicFixture() }))
+    if (url.endsWith('/bookmark')) return pending.promise
+    return new Response(null, { status: 204 })
+  }))
+  renderTopic()
+  const add = await screen.findByRole('button', { name: 'Добавить в закладки' })
+
+  fireEvent.click(add)
+  expect(await screen.findByRole('button', { name: 'Убрать из закладок' })).toHaveAttribute('aria-pressed', 'true')
+  pending.resolve(new Response('', { status: 503 }))
+
+  expect(await screen.findByRole('button', { name: 'Добавить в закладки' })).toHaveAttribute('aria-pressed', 'false')
+  expect(screen.getByRole('alert')).toHaveTextContent('Предыдущее состояние восстановлено')
+})
+
+test('optimistically updates and restores an exact checklist value after failure', async () => {
+  const pending = deferred<Response>()
+  const checklistRequests: RequestInit[] = []
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    if (url.includes('/auth/me')) return sessionResponse()
+    if (url.endsWith('/topics/goroutines')) return new Response(JSON.stringify({ data: topicFixture() }))
+    if (url.includes('/checklist/c1')) {
+      checklistRequests.push(init ?? {})
+      return pending.promise
+    }
+    return new Response(null, { status: 204 })
+  }))
+  renderTopic()
+  const checkbox = await screen.findByLabelText('Объяснить модель GMP')
+  expect(checkbox).not.toBeChecked()
+
+  fireEvent.click(checkbox)
+  await waitFor(() => expect(screen.getByLabelText('Объяснить модель GMP')).toBeChecked())
+  expect(checklistRequests).toHaveLength(1)
+  expect(checklistRequests[0]).toMatchObject({ method: 'PUT', body: JSON.stringify({ completed: true }) })
+  pending.resolve(new Response('', { status: 503 }))
+
+  await waitFor(() => expect(screen.getByLabelText('Объяснить модель GMP')).not.toBeChecked())
+  expect(screen.getByRole('alert')).toHaveTextContent('Предыдущее состояние восстановлено')
+})
+
 function mockTopic(data: ReturnType<typeof topicFixture>) {
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => String(input).includes('/auth/me')
     ? sessionResponse()
@@ -79,5 +155,12 @@ function topicFixture() {
     follow_ups: [{ id: 'f1', interview_question_id: 'q1', question: 'Что произойдёт при блокировке?', expected_answer: 'Runtime перепланирует работу.', sort_order: 1 }],
     resources: [{ id: 'r1', title: 'Go memory model', url: 'https://go.dev/ref/mem', resource_type: 'documentation', source_name: 'Go', sort_order: 1 }],
     practice: [{ id: 'p1', title: 'Написать worker pool', description: 'Ограничить число **worker**.', url: 'https://go.dev/', expected_outcome: 'Нет утечек', sort_order: 1 }],
+    user_state: { status: 'not_started' as const, review_required: false, bookmarked: false, checklist: { c1: false } },
   }
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((done) => { resolve = done })
+  return { promise, resolve }
 }
