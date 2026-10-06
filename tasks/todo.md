@@ -16,8 +16,8 @@
 
 - [x] T04 Catalog migration. Acceptance: UUID keys, FK/check constraints, stable unique keys и индексы для заявленных lookups. Verify: migrate up/down/up на PostgreSQL 18.6. Depends: T02. Scope: M.
 - [x] T05 sqlc catalog queries и идемпотентный test seed. Acceptance: повторный seed не создаёт дубликаты. Verify: integration test + `sqlc generate` leaves no diff. Depends: T04. Scope: M.
-- [ ] T06 Categories/list topics API. Acceptance: все фильтры валидируются, pagination capped, sort детерминирован. Verify: table/integration tests для valid и invalid combinations. Depends: T05,T03. Scope: M.
-- [ ] T07 Topic detail API. Acceptance: один payload содержит sections, checklist, questions, follow-ups, pitfalls, resources и practice; неизвестный slug → safe 404. Verify: contract integration tests. Depends: T05,T03. Scope: M.
+- [x] T06 Categories/list topics API. Acceptance: все фильтры валидируются, pagination capped, sort детерминирован. Verify: table/integration tests для valid и invalid combinations. Depends: T05,T03. Scope: M.
+- [x] T07 Topic detail API. Acceptance: один payload содержит sections, checklist, questions, follow-ups, pitfalls, resources и practice; неизвестный slug → safe 404. Verify: contract integration tests. Depends: T05,T03. Scope: M.
 
 ### Checkpoint B
 

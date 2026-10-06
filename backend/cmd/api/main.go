@@ -10,9 +10,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/FedorOnpoint/track_app/backend/internal/catalog"
+	"github.com/FedorOnpoint/track_app/backend/internal/catalog/catalogdb"
 	"github.com/FedorOnpoint/track_app/backend/internal/platform/config"
 	"github.com/FedorOnpoint/track_app/backend/internal/platform/database"
 	"github.com/FedorOnpoint/track_app/backend/internal/platform/httpserver"
+	"github.com/go-chi/chi/v5"
 )
 
 func main() {
@@ -45,7 +48,10 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		return fmt.Errorf("listen: %w", err)
 	}
 
-	server := httpserver.NewServer(cfg.Addr, httpserver.NewHandler(pool, logger))
+	catalogQueries := catalogdb.New(pool)
+	server := httpserver.NewServer(cfg.Addr, httpserver.NewHandler(pool, logger, func(router chi.Router) {
+		catalog.MountRoutes(router, catalogQueries)
+	}))
 	logger.Info("application started", "addr", cfg.Addr, "environment", cfg.Environment)
 	if err := httpserver.Run(ctx, server, listener); err != nil {
 		return fmt.Errorf("serve HTTP: %w", err)

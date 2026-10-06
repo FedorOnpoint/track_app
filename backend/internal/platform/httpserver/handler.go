@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/FedorOnpoint/track_app/backend/internal/platform/requestcontext"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -28,7 +29,9 @@ type errorBody struct {
 	RequestID string `json:"request_id"`
 }
 
-func NewHandler(checker ReadyChecker, logger *slog.Logger) http.Handler {
+type RouteMounter func(chi.Router)
+
+func NewHandler(checker ReadyChecker, logger *slog.Logger, mounters ...RouteMounter) http.Handler {
 	router := chi.NewRouter()
 	router.Use(requestIDMiddleware)
 	router.Use(requestLogMiddleware(logger))
@@ -45,6 +48,9 @@ func NewHandler(checker ReadyChecker, logger *slog.Logger) http.Handler {
 		}
 		writeJSON(writer, http.StatusOK, map[string]string{"status": "ok"})
 	})
+	for _, mount := range mounters {
+		router.Route("/api/v1", mount)
+	}
 	return router
 }
 
@@ -65,7 +71,7 @@ func requestLogMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 			wrapped := &statusWriter{ResponseWriter: writer, status: http.StatusOK}
 			next.ServeHTTP(wrapped, request)
 
-			requestID, _ := request.Context().Value(requestIDContextKey{}).(string)
+			requestID := requestcontext.RequestID(request.Context())
 			logger.InfoContext(request.Context(), "http request",
 				"request_id", requestID,
 				"method", request.Method,
@@ -81,12 +87,10 @@ func requestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		requestID := newRequestID()
 		writer.Header().Set(requestIDHeader, requestID)
-		ctx := context.WithValue(request.Context(), requestIDContextKey{}, requestID)
+		ctx := requestcontext.WithRequestID(request.Context(), requestID)
 		next.ServeHTTP(writer, request.WithContext(ctx))
 	})
 }
-
-type requestIDContextKey struct{}
 
 func newRequestID() string {
 	bytes := make([]byte, 16)
@@ -97,7 +101,7 @@ func newRequestID() string {
 }
 
 func writeError(writer http.ResponseWriter, request *http.Request, status int, code, message string) {
-	requestID, _ := request.Context().Value(requestIDContextKey{}).(string)
+	requestID := requestcontext.RequestID(request.Context())
 	writeJSON(writer, status, errorResponse{Error: errorBody{
 		Code:      code,
 		Message:   message,
