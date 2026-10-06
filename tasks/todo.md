@@ -37,7 +37,7 @@
 
 ## Этап 4 — прогресс и личные данные
 
-- [ ] T13 Progress/checklist migration и API. Acceptance: allowed enums only, PUT idempotent, concurrent updates preserve valid state. Verify: integration + concurrency tests. Depends: T10,T07. Scope: M.
+- [x] T13 Progress/checklist migration и API. Acceptance: allowed enums only, PUT idempotent, concurrent updates preserve valid state. Verify: integration + concurrency tests. Depends: T10,T07. Scope: M.
 - [ ] T14 Bookmarks migration и API. Acceptance: set/delete idempotent, list filtered to current user. Verify: integration tests. Depends: T10,T07. Scope: M.
 - [ ] T15 Notes migration и CRUD API. Acceptance: ownership enforced in SQL predicates; body bounded; 404 avoids existence disclosure. Verify: two-user integration tests. Depends: T10,T07. Scope: M.
 - [ ] T16 Dashboard aggregates и last-opened. Acceptance: empty/full category math correct, recent items deterministic. Verify: aggregate integration tests. Depends: T13,T15. Scope: M.

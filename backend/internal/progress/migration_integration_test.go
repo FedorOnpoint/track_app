@@ -6,11 +6,16 @@ import (
 	"context"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/FedorOnpoint/track_app/backend/internal/platform/database"
+	"github.com/FedorOnpoint/track_app/backend/internal/progress"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -68,6 +73,56 @@ func TestProgressMigrationEnforcesStateConstraints(t *testing.T) {
 	}
 	if _, err := connection.Exec(ctx, `INSERT INTO checklist_progress (user_id, checklist_item_id, completed) VALUES ($1, $2, false)`, userID, itemID); err == nil {
 		t.Fatal("duplicate user/checklist progress was accepted")
+	}
+
+	if _, err := connection.Exec(ctx, `DELETE FROM checklist_progress; DELETE FROM topic_progress`); err != nil {
+		t.Fatal(err)
+	}
+	pool, err := database.Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	store := progress.NewPostgresStore(pool)
+	parsedUserID := uuid.MustParse(userID)
+	statuses := []string{"not_started", "learning", "review", "mastered"}
+	var wait sync.WaitGroup
+	errorsFound := make(chan error, 24)
+	for index := 0; index < 24; index++ {
+		wait.Add(1)
+		go func(index int) {
+			defer wait.Done()
+			_, err := store.SetTopicProgress(ctx, parsedUserID, "goroutines", statuses[index%len(statuses)], index%2 == 0, time.Now().UTC())
+			errorsFound <- err
+		}(index)
+	}
+	wait.Wait()
+	close(errorsFound)
+	for err := range errorsFound {
+		if err != nil {
+			t.Fatalf("concurrent progress update: %v", err)
+		}
+	}
+	var count int
+	var finalStatus string
+	if err := connection.QueryRow(ctx, `SELECT count(*), min(status) FROM topic_progress WHERE user_id = $1 AND topic_id = $2`, userID, topicID).Scan(&count, &finalStatus); err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("progress rows=%d, want 1", count)
+	}
+	valid := false
+	for _, status := range statuses {
+		valid = valid || finalStatus == status
+	}
+	if !valid {
+		t.Fatalf("final status=%q is invalid", finalStatus)
+	}
+	parsedItemID := uuid.MustParse(itemID)
+	for range 2 {
+		if _, err := store.SetChecklistProgress(ctx, parsedUserID, "goroutines", parsedItemID, true, time.Now().UTC()); err != nil {
+			t.Fatalf("idempotent checklist update: %v", err)
+		}
 	}
 }
 

@@ -16,6 +16,7 @@ import (
 	"github.com/FedorOnpoint/track_app/backend/internal/platform/config"
 	"github.com/FedorOnpoint/track_app/backend/internal/platform/database"
 	"github.com/FedorOnpoint/track_app/backend/internal/platform/httpserver"
+	"github.com/FedorOnpoint/track_app/backend/internal/progress"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -56,6 +57,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		router.Group(func(protected chi.Router) {
 			protected.Use(authHandler.Require)
 			catalog.MountRoutes(protected, catalogQueries)
+			progress.MountRoutes(protected, progress.NewPostgresStore(pool))
 		})
 	}))
 	logger.Info("application started", "addr", cfg.Addr, "environment", cfg.Environment)
