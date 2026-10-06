@@ -3,6 +3,7 @@ import { FormEvent, useCallback, useEffect, useState } from 'react'
 type Category = { id: string; slug: string; title: string; description: string }
 type Topic = { id: string; slug: string; title: string; summary: string; difficulty: 'basic' | 'intermediate' | 'advanced'; estimated_minutes: number; category_slug: string; category_title: string }
 type Pagination = { page: number; page_size: number; total_items: number; total_pages: number }
+type User = { id: string; login: string }
 const difficultyLabel = { basic: 'База', intermediate: 'Middle', advanced: 'Продвинутая' }
 
 async function getJSON<T>(url: string, signal: AbortSignal): Promise<T> {
@@ -12,6 +13,11 @@ async function getJSON<T>(url: string, signal: AbortSignal): Promise<T> {
 }
 
 export function App() {
+	const [user, setUser] = useState<User | null | undefined>(undefined)
+	const [login, setLogin] = useState('')
+	const [password, setPassword] = useState('')
+	const [loginError, setLoginError] = useState(false)
+	const [loginPending, setLoginPending] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
   const [topics, setTopics] = useState<Topic[]>([])
   const [pagination, setPagination] = useState<Pagination>({ page: 1, page_size: 20, total_items: 0, total_pages: 0 })
@@ -21,6 +27,17 @@ export function App() {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+
+	useEffect(() => {
+		const controller = new AbortController()
+		fetch('/api/v1/auth/me', { signal: controller.signal }).then(async (response) => {
+			if (!response.ok) { setUser(null); return }
+			const body = await response.json() as { data: User }; setUser(body.data)
+		}).catch((requestError: unknown) => {
+			if (!(requestError instanceof DOMException && requestError.name === 'AbortError')) setUser(null)
+		})
+		return () => controller.abort()
+	}, [])
 
   const loadCatalog = useCallback((signal: AbortSignal) => {
     setLoading(true); setError(false)
@@ -39,18 +56,34 @@ export function App() {
   }, [category, difficulty, query])
 
   useEffect(() => {
+		if (!user) return
     const controller = new AbortController(); void loadCatalog(controller.signal)
     return () => controller.abort()
-  }, [loadCatalog])
+  }, [loadCatalog, user])
 
   function submitSearch(event: FormEvent) { event.preventDefault(); setQuery(searchDraft.trim()) }
+	async function submitLogin(event: FormEvent) {
+		event.preventDefault(); setLoginPending(true); setLoginError(false)
+		try {
+			const response = await fetch('/api/v1/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login, password }) })
+			if (!response.ok) { setLoginError(true); return }
+			const body = await response.json() as { data: User }; setUser(body.data); setPassword('')
+		} catch { setLoginError(true) } finally { setLoginPending(false) }
+	}
+	async function logout() { await fetch('/api/v1/auth/logout', { method: 'POST' }); setUser(null) }
   const totalMinutes = topics.reduce((sum, topic) => sum + topic.estimated_minutes, 0)
+
+	if (user === undefined) return <div className="auth-loading"><span className="loader" /><span>Проверяем сессию…</span></div>
+	if (user === null) return <main className="login-page">
+		<section className="login-aside"><a className="brand login-brand" href="/"><span className="brand-mark">Go</span><span>Interview</span></a><div><p className="eyebrow">Middle Go Backend</p><h1>Готовьтесь<br />системно.</h1><p>Теория, вопросы и практика — в одном персональном треке.</p></div><span className="login-note">Локальное пространство подготовки</span></section>
+		<section className="login-panel"><form className="login-form" onSubmit={submitLogin}><p className="eyebrow">Защищённый доступ</p><h2>С возвращением</h2><p>Войдите, чтобы продолжить с того места, где остановились.</p><label>Логин<input aria-label="Логин" autoComplete="username" value={login} onChange={(event) => setLogin(event.target.value)} required /></label><label>Пароль<input aria-label="Пароль" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={12} required /></label>{loginError && <div className="login-error" role="alert">Неверный логин или пароль</div>}<button type="submit" disabled={loginPending}>{loginPending ? 'Входим…' : 'Войти'}</button></form></section>
+	</main>
 
   return <div className="app-shell">
     <header className="topbar">
       <a className="brand" href="#top" aria-label="Go Interview — на главную"><span className="brand-mark">Go</span><span>Interview</span></a>
       <nav className="main-nav" aria-label="Основная навигация"><a className="active" href="#map">Карта знаний</a><a href="#review">Повторение</a><a href="#progress">Прогресс</a></nav>
-      <button className="profile" type="button" aria-label="Открыть профиль">Ф</button>
+      <button className="profile" type="button" aria-label="Выйти" onClick={() => void logout()}>{user.login.slice(0, 1).toUpperCase()}</button>
     </header>
     <main id="top">
       <section className="intro" aria-labelledby="map-title">
