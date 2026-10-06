@@ -27,7 +27,7 @@
 
 - [x] T08 Users/sessions migration и bootstrap command. Acceptance: bootstrap idempotent, existing password не меняется, secrets не логируются. Verify: integration/CLI tests. Depends: T04. Scope: M.
 - [x] T09 Password/session primitives. Acceptance: OWASP-aligned Argon2id, CSPRNG token ≥256 bits, only token hash stored, constant-shape credential failure. Verify: unit/property tests. Depends: T08. Scope: M.
-- [ ] T10 Login/logout/me и auth middleware. Acceptance: private endpoints return 401 without valid session; login rotates cookie; throttling bounded. Verify: `httptest` + PostgreSQL integration matrix. Depends: T09. Scope: M.
+- [x] T10 Login/logout/me и auth middleware. Acceptance: private endpoints return 401 without valid session; login rotates cookie; throttling bounded. Verify: `httptest` + PostgreSQL integration matrix. Depends: T09. Scope: M.
 - [ ] T11 Password change/logout-all/session lifecycle. Acceptance: expiry/revocation enforced; password change revokes other sessions and rotates current session. Verify: multi-session integration tests. Depends: T10. Scope: M.
 - [ ] T12 HTTP security boundary. Acceptance: Origin/Referer, cookie attributes, body limit and security headers behave by environment. Verify: table-driven security tests and manual header inspection. Depends: T10,T11. Scope: M.
 

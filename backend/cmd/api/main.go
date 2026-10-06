@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/FedorOnpoint/track_app/backend/internal/auth"
 	"github.com/FedorOnpoint/track_app/backend/internal/catalog"
 	"github.com/FedorOnpoint/track_app/backend/internal/catalog/catalogdb"
 	"github.com/FedorOnpoint/track_app/backend/internal/platform/config"
@@ -49,8 +50,13 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	}
 
 	catalogQueries := catalogdb.New(pool)
+	authHandler := auth.NewHandler(auth.NewService(auth.NewPostgresSessionStore(pool), auth.NewPasswordService(), cfg.SessionTTL), cfg.Environment == "production")
 	server := httpserver.NewServer(cfg.Addr, httpserver.NewHandler(pool, logger, func(router chi.Router) {
-		catalog.MountRoutes(router, catalogQueries)
+		authHandler.Mount(router)
+		router.Group(func(protected chi.Router) {
+			protected.Use(authHandler.Require)
+			catalog.MountRoutes(protected, catalogQueries)
+		})
 	}))
 	logger.Info("application started", "addr", cfg.Addr, "environment", cfg.Environment)
 	if err := httpserver.Run(ctx, server, listener); err != nil {
