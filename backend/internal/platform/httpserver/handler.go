@@ -6,7 +6,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"log/slog"
+	"net"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/FedorOnpoint/track_app/backend/internal/platform/requestcontext"
@@ -14,6 +17,13 @@ import (
 )
 
 const requestIDHeader = "X-Request-ID"
+
+const maxRequestBodyBytes = 1 << 20
+
+type SecurityConfig struct {
+	Environment string
+	Domain      string
+}
 
 type ReadyChecker interface {
 	Ping(context.Context) error
@@ -31,10 +41,12 @@ type errorBody struct {
 
 type RouteMounter func(chi.Router)
 
-func NewHandler(checker ReadyChecker, logger *slog.Logger, mounters ...RouteMounter) http.Handler {
+func NewHandler(checker ReadyChecker, logger *slog.Logger, security SecurityConfig, mounters ...RouteMounter) http.Handler {
 	router := chi.NewRouter()
 	router.Use(requestIDMiddleware)
+	router.Use(securityHeadersMiddleware(security))
 	router.Use(requestLogMiddleware(logger))
+	router.Use(requestBoundaryMiddleware(security))
 	router.Get("/api/v1/health/live", func(writer http.ResponseWriter, _ *http.Request) {
 		writeJSON(writer, http.StatusOK, map[string]string{"status": "ok"})
 	})
@@ -52,6 +64,75 @@ func NewHandler(checker ReadyChecker, logger *slog.Logger, mounters ...RouteMoun
 		router.Route("/api/v1", mount)
 	}
 	return router
+}
+
+func securityHeadersMiddleware(config SecurityConfig) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none'")
+			writer.Header().Set("X-Content-Type-Options", "nosniff")
+			writer.Header().Set("X-Frame-Options", "DENY")
+			writer.Header().Set("Referrer-Policy", "no-referrer")
+			if config.Environment == "production" {
+				writer.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+			}
+			next.ServeHTTP(writer, request)
+		})
+	}
+}
+
+func requestBoundaryMiddleware(config SecurityConfig) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			request.Body = http.MaxBytesReader(writer, request.Body, maxRequestBodyBytes)
+			if isSafeMethod(request.Method) {
+				next.ServeHTTP(writer, request)
+				return
+			}
+			source := request.Header.Get("Origin")
+			isReferer := false
+			if source == "" {
+				source = request.Header.Get("Referer")
+				isReferer = true
+			}
+			if !allowedRequestSource(source, isReferer, config) {
+				writeError(writer, request, http.StatusForbidden, "forbidden_origin", "Источник запроса не разрешён")
+				return
+			}
+			next.ServeHTTP(writer, request)
+		})
+	}
+}
+
+func isSafeMethod(method string) bool {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions, http.MethodTrace:
+		return true
+	default:
+		return false
+	}
+}
+
+func allowedRequestSource(source string, referer bool, config SecurityConfig) bool {
+	parsed, err := url.Parse(source)
+	if err != nil || parsed.User != nil || parsed.Opaque != "" || parsed.Scheme == "" || parsed.Host == "" || parsed.Fragment != "" {
+		return false
+	}
+	if !referer && ((parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "") {
+		return false
+	}
+	if config.Environment == "production" {
+		return parsed.Scheme == "https" && strings.EqualFold(parsed.Host, config.Domain)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return false
+	}
+	hostname := parsed.Hostname()
+	if strings.EqualFold(hostname, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(hostname)
+	return ip != nil && ip.IsLoopback()
 }
 
 type statusWriter struct {

@@ -51,7 +51,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 
 	catalogQueries := catalogdb.New(pool)
 	authHandler := auth.NewHandler(auth.NewService(auth.NewPostgresSessionStore(pool), auth.NewPasswordService(), cfg.SessionTTL), cfg.Environment == "production")
-	server := httpserver.NewServer(cfg.Addr, httpserver.NewHandler(pool, logger, func(router chi.Router) {
+	server := httpserver.NewServer(cfg.Addr, httpserver.NewHandler(pool, logger, httpserver.SecurityConfig{Environment: cfg.Environment, Domain: cfg.Domain}, func(router chi.Router) {
 		authHandler.Mount(router)
 		router.Group(func(protected chi.Router) {
 			protected.Use(authHandler.Require)

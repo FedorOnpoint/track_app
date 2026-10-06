@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -126,5 +127,45 @@ func TestLogoutAllRevokesEverySession(t *testing.T) {
 	router.ServeHTTP(response, request)
 	if response.Code != http.StatusNoContent || !store.revokedAll {
 		t.Fatalf("status=%d revokedAll=%v", response.Code, store.revokedAll)
+	}
+}
+
+func TestSessionCookieAttributesByEnvironment(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		secure     bool
+		wantSecure bool
+	}{
+		{name: "development"},
+		{name: "production", secure: true, wantSecure: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			store := &memorySessions{user: User{ID: uuid.New(), Login: "fedor", PasswordHash: "encoded"}}
+			handler := NewHandler(NewService(store, &recordingVerifier{match: true}, time.Hour), test.secure)
+			router := chi.NewRouter()
+			handler.Mount(router)
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString(`{"login":"fedor","password":"current-password"}`)))
+			cookies := response.Result().Cookies()
+			if len(cookies) != 1 {
+				t.Fatalf("cookies=%d, want 1", len(cookies))
+			}
+			cookie := cookies[0]
+			if !cookie.HttpOnly || cookie.Secure != test.wantSecure || cookie.SameSite != http.SameSiteLaxMode || cookie.Path != "/" || cookie.MaxAge != 3600 {
+				t.Fatalf("cookie attributes=%#v", cookie)
+			}
+		})
+	}
+}
+
+func TestLoginRejectsOversizedBody(t *testing.T) {
+	handler := NewHandler(NewService(&memorySessions{}, &recordingVerifier{}, time.Hour), false)
+	router := chi.NewRouter()
+	handler.Mount(router)
+	response := httptest.NewRecorder()
+	body := `{"login":"fedor","password":"` + strings.Repeat("x", 5000) + `"}`
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/auth/login", strings.NewReader(body)))
+	if response.Code < 400 || response.Code >= 500 {
+		t.Fatalf("status=%d, want controlled 4xx", response.Code)
 	}
 }

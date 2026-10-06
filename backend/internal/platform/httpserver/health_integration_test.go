@@ -40,7 +40,7 @@ func TestReadinessTracksPostgresAvailability(t *testing.T) {
 	}
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	handler := httpserver.NewHandler(pool, logger)
+	handler := httpserver.NewHandler(pool, logger, httpserver.SecurityConfig{Environment: "development", Domain: "localhost"})
 
 	ready := httptest.NewRecorder()
 	handler.ServeHTTP(ready, httptest.NewRequest(http.MethodGet, "/api/v1/health/ready", nil))
