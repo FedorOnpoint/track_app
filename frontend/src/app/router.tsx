@@ -2,6 +2,7 @@ import { createBrowserRouter, type RouteObject } from 'react-router'
 
 import { App } from '../App'
 import { DashboardPage } from '../pages/DashboardPage'
+import { TopicPage } from '../pages/TopicPage'
 import { AuthLayout, LoginPage, ProtectedRoute } from './auth'
 import { AppLayout } from './layout'
 
@@ -20,6 +21,7 @@ export const appRoutes: RouteObject[] = [{
         children: [
           { index: true, Component: DashboardPage },
           { path: '/topics', Component: App },
+          { path: '/topics/:slug', Component: TopicPage },
         ],
       }],
     },
