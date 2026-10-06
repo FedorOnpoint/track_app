@@ -1,0 +1,12 @@
+version: "2"
+sql:
+  - engine: postgresql
+    schema: migrations/000001_create_catalog.up.sql
+    queries: queries/catalog.sql
+    gen:
+      go:
+        package: catalogdb
+        out: internal/catalog/catalogdb
+        sql_package: pgx/v5
+        emit_json_tags: true
+        emit_empty_slices: true
