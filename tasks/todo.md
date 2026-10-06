@@ -6,11 +6,11 @@
 
 - [x] T01 Toolchain manifests, backend/frontend smoke builds и Makefile interface. Acceptance: `make test`, `make lint`, `make build` доступны без неописанных global tools. Verify: выполнить все три команды. Depends: —. Scope: M, до 5 файлов.
 - [x] T02 Development PostgreSQL Compose и validated config. Acceptance: missing required config даёт понятную безопасную ошибку; БД не публикуется наружу. Verify: config unit tests + Compose config validation. Depends: T01. Scope: M.
-- [ ] T03 HTTP lifecycle и health endpoints. Acceptance: request ID/error envelope, server timeouts, graceful shutdown, live без БД, ready с bounded DB ping. Verify: `httptest`, integration readiness test, race test. Depends: T02. Scope: M.
+- [x] T03 HTTP lifecycle и health endpoints. Acceptance: request ID/error envelope, server timeouts, graceful shutdown, live без БД, ready с bounded DB ping. Verify: `httptest`, integration readiness test, race test. Depends: T02. Scope: M.
 
 ### Checkpoint A
 
-- [ ] Чистая сборка backend/frontend, тесты и линтеры проходят; пользователь одобрил переход к каталогу.
+- [x] Чистая сборка backend/frontend, тесты и линтеры проходят; пользователь одобрил переход к каталогу.
 
 ## Этап 2 — каталог знаний
 
