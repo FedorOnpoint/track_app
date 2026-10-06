@@ -1,4 +1,6 @@
-import { FormEvent, useCallback, useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { FormEvent, useEffect, useState } from 'react'
+import { Link, useSearchParams } from 'react-router'
 
 import { apiRequest } from './shared/api/client'
 import type { ApiEnvelope, PaginatedEnvelope } from './shared/api/types'
@@ -9,38 +11,50 @@ type Pagination = { page: number; page_size: number; total_items: number; total_
 const difficultyLabel = { basic: 'База', intermediate: 'Middle', advanced: 'Продвинутая' }
 
 export function App() {
-  const [categories, setCategories] = useState<Category[]>([])
-  const [topics, setTopics] = useState<Topic[]>([])
-  const [pagination, setPagination] = useState<Pagination>({ page: 1, page_size: 20, total_items: 0, total_pages: 0 })
-  const [category, setCategory] = useState('')
-  const [difficulty, setDifficulty] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const category = searchParams.get('category') ?? ''
+  const difficulty = searchParams.get('difficulty') ?? ''
+  const query = searchParams.get('query') ?? ''
+  const page = positivePage(searchParams.get('page'))
   const [searchDraft, setSearchDraft] = useState('')
-  const [query, setQuery] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
-
-  const loadCatalog = useCallback((signal: AbortSignal) => {
-    setLoading(true); setError(false)
-    const params = new URLSearchParams({ page_size: '20', sort: 'category' })
-    if (category) params.set('category', category)
-    if (difficulty) params.set('difficulty', difficulty)
-    if (query) params.set('query', query)
-    return Promise.all([
-      apiRequest<ApiEnvelope<Category[]>>('/categories', { signal }),
-      apiRequest<PaginatedEnvelope<Topic>>(`/topics?${params}`, { signal }),
-    ]).then(([categoryResponse, topicResponse]) => {
-      setCategories(categoryResponse.data); setTopics(topicResponse.data); setPagination(topicResponse.pagination)
-    }).catch((requestError: unknown) => {
-      if (!(requestError instanceof DOMException && requestError.name === 'AbortError')) setError(true)
-    }).finally(() => { if (!signal.aborted) setLoading(false) })
-  }, [category, difficulty, query])
+  const categoriesQuery = useQuery({
+    queryKey: ['categories'],
+    queryFn: async ({ signal }) => (await apiRequest<ApiEnvelope<Category[]>>('/categories', { signal })).data,
+  })
+  const topicsQuery = useQuery({
+    queryKey: ['topics', { category, difficulty, page, query }],
+    queryFn: async ({ signal }) => {
+      const params = new URLSearchParams({ page: String(page), page_size: '20', sort: 'category' })
+      if (category) params.set('category', category)
+      if (difficulty) params.set('difficulty', difficulty)
+      if (query) params.set('query', query)
+      return apiRequest<PaginatedEnvelope<Topic>>(`/topics?${params}`, { signal })
+    },
+  })
+  const categories = categoriesQuery.data ?? []
+  const topics = topicsQuery.data?.data ?? []
+  const pagination: Pagination = topicsQuery.data?.pagination ?? { page, page_size: 20, total_items: 0, total_pages: 0 }
+  const loading = categoriesQuery.isPending || topicsQuery.isPending
+  const error = categoriesQuery.isError || topicsQuery.isError
 
   useEffect(() => {
-    const controller = new AbortController(); void loadCatalog(controller.signal)
-    return () => controller.abort()
-  }, [loadCatalog])
+    setSearchDraft(query)
+  }, [query])
 
-  function submitSearch(event: FormEvent) { event.preventDefault(); setQuery(searchDraft.trim()) }
+  function updateFilters(updates: Record<string, string>) {
+    const next = new URLSearchParams(searchParams)
+    for (const [name, value] of Object.entries(updates)) {
+      if (value) next.set(name, value)
+      else next.delete(name)
+    }
+    if (!('page' in updates)) next.delete('page')
+    setSearchParams(next)
+  }
+
+  function submitSearch(event: FormEvent) {
+    event.preventDefault()
+    updateFilters({ query: searchDraft.trim() })
+  }
   const totalMinutes = topics.reduce((sum, topic) => sum + topic.estimated_minutes, 0)
 
   return <main id="top">
@@ -55,19 +69,24 @@ export function App() {
       <div className="content-grid" id="map">
         <aside className="filters" aria-label="Фильтры каталога">
           <div className="filter-heading"><h2>Разделы</h2><span>{categories.length}</span></div>
-          <button className={!category ? 'filter-option selected' : 'filter-option'} onClick={() => setCategory('')} type="button"><span>Все темы</span><span>↗</span></button>
-          {categories.map((item) => <button className={category === item.slug ? 'filter-option selected' : 'filter-option'} onClick={() => setCategory(item.slug)} type="button" key={item.id}><span>{item.title}</span><span>↗</span></button>)}
-          <div className="difficulty-filter"><h2>Сложность</h2><select value={difficulty} onChange={(event) => setDifficulty(event.target.value)} aria-label="Сложность"><option value="">Любая</option><option value="basic">База</option><option value="intermediate">Middle</option><option value="advanced">Продвинутая</option></select></div>
+          <button className={!category ? 'filter-option selected' : 'filter-option'} onClick={() => updateFilters({ category: '' })} type="button"><span>Все темы</span><span>↗</span></button>
+          {categories.map((item) => <button className={category === item.slug ? 'filter-option selected' : 'filter-option'} onClick={() => updateFilters({ category: item.slug })} type="button" key={item.id}><span>{item.title}</span><span>↗</span></button>)}
+          <div className="difficulty-filter"><h2>Сложность</h2><select value={difficulty} onChange={(event) => updateFilters({ difficulty: event.target.value })} aria-label="Сложность"><option value="">Любая</option><option value="basic">База</option><option value="intermediate">Middle</option><option value="advanced">Продвинутая</option></select></div>
         </aside>
         <section className="topic-area" aria-live="polite" aria-busy={loading}>
           <div className="list-heading"><div><p className="eyebrow">Учебный каталог</p><h2>{category ? categories.find((item) => item.slug === category)?.title : 'Все темы'}</h2></div><span className="result-count">{pagination.total_items} {topicWord(pagination.total_items)}</span></div>
           {loading && <div className="state"><span className="loader" />Загружаем карту знаний…</div>}
-          {error && <div className="state error" role="alert"><strong>Не удалось загрузить каталог</strong><span>Проверьте, запущен ли API, и попробуйте ещё раз.</span><button type="button" onClick={() => { const controller = new AbortController(); void loadCatalog(controller.signal) }}>Повторить</button></div>}
-          {!loading && !error && topics.length === 0 && <div className="state"><strong>Темы не найдены</strong><span>Измените поиск или сбросьте фильтры.</span><button type="button" onClick={() => { setCategory(''); setDifficulty(''); setQuery(''); setSearchDraft('') }}>Сбросить фильтры</button></div>}
-          {!loading && !error && topics.length > 0 && <ol className="topic-list">{topics.map((topic, index) => <li key={topic.id}><a className="topic-card" href={`/topics/${topic.slug}`}><span className="topic-number">{String(index + 1).padStart(2, '0')}</span><span className="topic-copy"><span className="topic-meta"><span>{topic.category_title}</span><span className={`difficulty ${topic.difficulty}`}>{difficultyLabel[topic.difficulty]}</span></span><strong>{topic.title}</strong><span>{topic.summary}</span></span><span className="topic-time"><strong>{topic.estimated_minutes}</strong><span>мин</span></span><span className="topic-arrow" aria-hidden="true">→</span></a></li>)}</ol>}
+          {error && <div className="state error" role="alert"><strong>Не удалось загрузить каталог</strong><span>Проверьте, запущен ли API, и попробуйте ещё раз.</span><button type="button" onClick={() => { void categoriesQuery.refetch(); void topicsQuery.refetch() }}>Повторить</button></div>}
+          {!loading && !error && topics.length === 0 && <div className="state"><strong>Темы не найдены</strong><span>Измените поиск или сбросьте фильтры.</span><button type="button" onClick={() => { setSearchDraft(''); setSearchParams({}) }}>Сбросить фильтры</button></div>}
+          {!loading && !error && topics.length > 0 && <><ol className="topic-list">{topics.map((topic, index) => <li key={topic.id}><Link className="topic-card" to={`/topics/${topic.slug}`}><span className="topic-number">{String((pagination.page - 1) * pagination.page_size + index + 1).padStart(2, '0')}</span><span className="topic-copy"><span className="topic-meta"><span>{topic.category_title}</span><span className={`difficulty ${topic.difficulty}`}>{difficultyLabel[topic.difficulty]}</span></span><strong>{topic.title}</strong><span>{topic.summary}</span></span><span className="topic-time"><strong>{topic.estimated_minutes}</strong><span>мин</span></span><span className="topic-arrow" aria-hidden="true">→</span></Link></li>)}</ol><nav className="pagination" aria-label="Страницы каталога"><button type="button" disabled={pagination.page <= 1} onClick={() => updateFilters({ page: String(pagination.page - 1) })}>Назад</button><span>Страница {pagination.page} из {pagination.total_pages}</span><button type="button" disabled={pagination.page >= pagination.total_pages} onClick={() => updateFilters({ page: String(pagination.page + 1) })}>Далее</button></nav></>}
         </section>
       </div>
   </main>
+}
+
+function positivePage(value: string | null) {
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1
 }
 
 function topicWord(count: number) {

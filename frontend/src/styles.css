@@ -56,6 +56,9 @@ h1,h2,p { margin-top:0; } h1 { margin-bottom:10px; font:600 clamp(42px,6vw,72px)
 .topic-meta { display:flex; align-items:center; gap:10px; color:var(--accent); text-transform:uppercase; font-size:9px; font-weight:700; letter-spacing:.1em; }
 .difficulty { padding:3px 6px; border-radius:3px; background:var(--accent-soft); letter-spacing:.06em; } .difficulty.advanced { color:#884b25; background:#f3e4d6; } .difficulty.basic { color:#425c78; background:#e2eaf1; }
 .topic-time { display:grid; text-align:right; color:var(--muted); font-size:10px; } .topic-time strong { color:var(--ink); font:600 20px 'Source Serif 4',serif; } .topic-arrow { font-size:20px; }
+.pagination { padding:24px 0; display:flex; align-items:center; justify-content:flex-end; gap:16px; color:var(--muted); font-size:12px; }
+.pagination button { padding:9px 14px; border:1px solid var(--line); background:var(--surface); color:var(--ink); cursor:pointer; }
+.pagination button:disabled { opacity:.45; cursor:not-allowed; }
 .state { min-height:300px; display:flex; flex-direction:column; gap:10px; align-items:center; justify-content:center; color:var(--muted); text-align:center; } .state strong { color:var(--ink); font:600 24px 'Source Serif 4',serif; }
 .state button { margin-top:8px; padding:10px 16px; border:1px solid var(--ink); background:transparent; cursor:pointer; }
 .dashboard-intro { align-items:center; }

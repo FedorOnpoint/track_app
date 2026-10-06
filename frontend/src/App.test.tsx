@@ -95,6 +95,53 @@ test('keeps login failures generic and the form accessible', async () => {
   expect(screen.getByLabelText('Пароль')).toHaveAttribute('type', 'password')
 })
 
+test('synchronizes catalog filters, search and pagination with the URL', async () => {
+  const topicURLs: string[] = []
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input)
+    if (url.includes('/auth/me')) return new Response(JSON.stringify({ data: { id: 'u1', login: 'fedor' } }))
+    if (url.includes('/categories')) return new Response(JSON.stringify({ data: [{ id: 'c1', slug: 'concurrency', title: 'Конкурентность', description: '' }] }))
+    topicURLs.push(url)
+    const requestedPage = Number(new URL(url, 'https://example.test').searchParams.get('page'))
+    return new Response(JSON.stringify({
+      data: [{ id: 't1', slug: 'goroutines', title: 'Горутины', summary: 'GMP', difficulty: 'intermediate', estimated_minutes: 20, category_slug: 'concurrency', category_title: 'Конкурентность' }],
+      pagination: { page: requestedPage, page_size: 20, total_items: 41, total_pages: 3 },
+    }))
+  }))
+  const router = renderApp(['/topics?query=goroutines&category=concurrency&difficulty=intermediate&page=2'])
+
+  await waitFor(() => expect(screen.getByText('Горутины')).toBeInTheDocument())
+  expect(screen.getByPlaceholderText('Найти тему, например goroutines')).toHaveValue('goroutines')
+  expect(screen.getByLabelText('Сложность')).toHaveValue('intermediate')
+  expect(topicURLs[0]).toContain('query=goroutines')
+  expect(topicURLs[0]).toContain('page=2')
+
+  fireEvent.change(screen.getByPlaceholderText('Найти тему, например goroutines'), { target: { value: 'channels' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Найти' }))
+  await waitFor(() => expect(router.state.location.search).toContain('query=channels'))
+  expect(router.state.location.search).not.toContain('page=')
+
+  await waitFor(() => expect(screen.getByText('Страница 1 из 3')).toBeInTheDocument())
+  fireEvent.click(screen.getByRole('button', { name: 'Далее' }))
+  await waitFor(() => expect(router.state.location.search).toContain('page=2'))
+})
+
+test('resets all catalog URL filters from an empty result', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input)
+    if (url.includes('/auth/me')) return new Response(JSON.stringify({ data: { id: 'u1', login: 'fedor' } }))
+    if (url.includes('/categories')) return new Response(JSON.stringify({ data: [] }))
+    return new Response(JSON.stringify({ data: [], pagination: { page: 3, page_size: 20, total_items: 0, total_pages: 0 } }))
+  }))
+  const router = renderApp(['/topics?query=missing&difficulty=advanced&page=3'])
+
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Сбросить фильтры' })).toBeInTheDocument())
+  fireEvent.click(screen.getByRole('button', { name: 'Сбросить фильтры' }))
+
+  await waitFor(() => expect(router.state.location.search).toBe(''))
+  expect(screen.getByPlaceholderText('Найти тему, например goroutines')).toHaveValue('')
+})
+
 function renderApp(initialEntries = ['/']) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const router = createMemoryRouter(appRoutes, { initialEntries })

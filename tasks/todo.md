@@ -52,7 +52,7 @@
 - [x] T18 App shell/router/API client/QueryClient. Acceptance: typed envelopes, abortable requests, global 401 and safe error mapping. Verify: unit/component tests + production build. Depends: T10,T17. Scope: M.
 - [x] T19 Login и protected routes. Acceptance: accessible form, generic error, redirect after success/401. Verify: RTL tests. Depends: T18. Scope: M.
 - [x] T20 Dashboard page. Acceptance: progress/category/review/recent/continue states render for loading/error/empty/success. Verify: RTL tests. Depends: T18,T16. Scope: M.
-- [ ] T21 Knowledge Map. Acceptance: search/filter/page state synchronized with URL and resettable. Verify: RTL router tests. Depends: T18,T06. Scope: M.
+- [x] T21 Knowledge Map. Acceptance: search/filter/page state synchronized with URL and resettable. Verify: RTL router tests. Depends: T18,T06. Scope: M.
 - [ ] T22 Topic content page и safe Markdown. Acceptance: semantic navigation; raw HTML and unsafe links do not execute. Verify: component/security tests. Depends: T18,T07. Scope: M.
 - [ ] T23 Topic progress/checklist/bookmark mutations. Acceptance: double submit prevented; optimistic rollback restores exact previous state. Verify: mutation component tests. Depends: T22,T13,T14. Scope: M.
 - [ ] T24 Notes CRUD UI. Acceptance: create/edit/delete confirmation, keyboard access, rollback/error state. Verify: RTL tests. Depends: T22,T15. Scope: M.
