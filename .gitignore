@@ -1,0 +1,19 @@
+.worktrees/
+.superpowers/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Build and dependency artifacts
+node_modules/
+dist/
+coverage/
+bin/
+*.test
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/
