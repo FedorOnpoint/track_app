@@ -22,7 +22,7 @@ test('renders catalog topics returned by the API', async () => {
     }))
   }))
 
-  renderApp()
+  renderApp(['/topics'])
 
   await waitFor(() => expect(screen.getByRole('heading', { name: 'Карта знаний' })).toBeInTheDocument())
   await waitFor(() => expect(screen.getByText('Горутины и планировщик')).toBeInTheDocument())
@@ -33,7 +33,7 @@ test('shows a useful error state', async () => {
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => String(input).includes('/auth/me')
     ? new Response(JSON.stringify({ data: { id: 'u1', login: 'fedor' } }))
     : new Response('', { status: 503 })))
-  renderApp()
+  renderApp(['/topics'])
   await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Не удалось загрузить каталог'))
 })
 
@@ -46,14 +46,14 @@ test('authenticates before opening the protected catalog', async () => {
     return new Response(JSON.stringify({ data: [], pagination: { page: 1, page_size: 20, total_items: 0, total_pages: 0 } }))
   })
   vi.stubGlobal('fetch', fetchMock)
-  const router = renderApp()
+  const router = renderApp(['/topics'])
   await waitFor(() => expect(screen.getByRole('heading', { name: 'С возвращением' })).toBeInTheDocument())
   expect(router.state.location.pathname).toBe('/login')
   fireEvent.change(screen.getByLabelText('Логин'), { target: { value: 'fedor' } })
   fireEvent.change(screen.getByLabelText('Пароль'), { target: { value: 'secret-password' } })
   fireEvent.click(screen.getByRole('button', { name: 'Войти' }))
   await waitFor(() => expect(screen.getByRole('heading', { name: 'Карта знаний' })).toBeInTheDocument())
-  expect(router.state.location.pathname).toBe('/')
+  expect(router.state.location.pathname).toBe('/topics')
   expect(fetchMock).toHaveBeenCalledWith('/api/v1/auth/login', expect.objectContaining({ method: 'POST' }))
 })
 
@@ -66,7 +66,7 @@ test('returns to login when any API request receives a 401', async () => {
     }), { status: 401 })
   }))
 
-  const router = renderApp()
+  const router = renderApp(['/topics'])
 
   await waitFor(() => expect(screen.getByRole('heading', { name: 'С возвращением' })).toBeInTheDocument())
   expect(router.state.location.pathname).toBe('/login')

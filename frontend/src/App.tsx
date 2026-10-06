@@ -1,6 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react'
 
-import { useAuth } from './app/auth'
 import { apiRequest } from './shared/api/client'
 import type { ApiEnvelope, PaginatedEnvelope } from './shared/api/types'
 
@@ -10,7 +9,6 @@ type Pagination = { page: number; page_size: number; total_items: number; total_
 const difficultyLabel = { basic: 'База', intermediate: 'Middle', advanced: 'Продвинутая' }
 
 export function App() {
-  const { user, logout } = useAuth()
   const [categories, setCategories] = useState<Category[]>([])
   const [topics, setTopics] = useState<Topic[]>([])
   const [pagination, setPagination] = useState<Pagination>({ page: 1, page_size: 20, total_items: 0, total_pages: 0 })
@@ -38,23 +36,14 @@ export function App() {
   }, [category, difficulty, query])
 
   useEffect(() => {
-		if (!user) return
     const controller = new AbortController(); void loadCatalog(controller.signal)
     return () => controller.abort()
-  }, [loadCatalog, user])
+  }, [loadCatalog])
 
   function submitSearch(event: FormEvent) { event.preventDefault(); setQuery(searchDraft.trim()) }
   const totalMinutes = topics.reduce((sum, topic) => sum + topic.estimated_minutes, 0)
 
-  if (!user) return null
-
-  return <div className="app-shell">
-    <header className="topbar">
-      <a className="brand" href="#top" aria-label="Go Interview — на главную"><span className="brand-mark">Go</span><span>Interview</span></a>
-      <nav className="main-nav" aria-label="Основная навигация"><a className="active" href="#map">Карта знаний</a><a href="#review">Повторение</a><a href="#progress">Прогресс</a></nav>
-      <button className="profile" type="button" aria-label="Выйти" onClick={() => void logout()}>{user.login.slice(0, 1).toUpperCase()}</button>
-    </header>
-    <main id="top">
+  return <main id="top">
       <section className="intro" aria-labelledby="map-title">
         <div><p className="eyebrow">Трек подготовки · Middle Go Backend</p><h1 id="map-title">Карта знаний</h1><p className="lead">Системный путь от устройства Go до проектирования production-сервисов.</p></div>
         <div className="study-summary" aria-label="Сводка каталога"><span><strong>{pagination.total_items}</strong> {topicWord(pagination.total_items)}</span><span><strong>{totalMinutes}</strong> минут в выборке</span></div>
@@ -78,9 +67,7 @@ export function App() {
           {!loading && !error && topics.length > 0 && <ol className="topic-list">{topics.map((topic, index) => <li key={topic.id}><a className="topic-card" href={`/topics/${topic.slug}`}><span className="topic-number">{String(index + 1).padStart(2, '0')}</span><span className="topic-copy"><span className="topic-meta"><span>{topic.category_title}</span><span className={`difficulty ${topic.difficulty}`}>{difficultyLabel[topic.difficulty]}</span></span><strong>{topic.title}</strong><span>{topic.summary}</span></span><span className="topic-time"><strong>{topic.estimated_minutes}</strong><span>мин</span></span><span className="topic-arrow" aria-hidden="true">→</span></a></li>)}</ol>}
         </section>
       </div>
-    </main>
-    <footer><span>Go Interview Tracker</span><span>Собрано для системной подготовки</span></footer>
-  </div>
+  </main>
 }
 
 function topicWord(count: number) {

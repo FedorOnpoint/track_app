@@ -94,7 +94,7 @@ export function LoginPage() {
     },
   })
 
-  if (user) return <Navigate to="/" replace />
+  if (user) return <Navigate to={getReturnPath(location.state)} replace />
 
   function submitLogin(event: FormEvent) {
     event.preventDefault()
