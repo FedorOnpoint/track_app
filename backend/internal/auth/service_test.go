@@ -11,9 +11,11 @@ import (
 )
 
 type memorySessions struct {
-	user      User
-	created   Session
-	revokedID uuid.UUID
+	user        User
+	created     Session
+	revokedID   uuid.UUID
+	revokedAll  bool
+	changedHash string
 }
 
 func (store *memorySessions) FindUserByLogin(_ context.Context, login string) (User, error) {
@@ -36,6 +38,16 @@ func (store *memorySessions) RevokeSession(_ context.Context, id uuid.UUID, _ ti
 	store.revokedID = id
 	return nil
 }
+func (store *memorySessions) RevokeAllSessions(_ context.Context, _ uuid.UUID, _ time.Time) error {
+	store.revokedAll = true
+	return nil
+}
+func (store *memorySessions) ChangePasswordAndRotate(_ context.Context, _ uuid.UUID, _ uuid.UUID, hash string, session Session, _ time.Time) error {
+	store.changedHash = hash
+	store.created = session
+	store.revokedAll = true
+	return nil
+}
 
 type recordingVerifier struct {
 	calls int
@@ -46,6 +58,7 @@ func (verifier *recordingVerifier) Verify(string, string) (bool, error) {
 	verifier.calls++
 	return verifier.match, nil
 }
+func (verifier *recordingVerifier) Hash(string) (string, error) { return "new-encoded-hash", nil }
 
 func TestLoginCreatesHashedSessionToken(t *testing.T) {
 	store := &memorySessions{user: User{ID: uuid.New(), Login: "fedor", PasswordHash: "encoded"}}
@@ -75,5 +88,24 @@ func TestLoginUsesSameVerificationPathForUnknownUser(t *testing.T) {
 	}
 	if verifier.calls != 1 {
 		t.Fatalf("Verify calls = %d, want 1", verifier.calls)
+	}
+}
+
+func TestChangePasswordRotatesCurrentAndRevokesOtherSessions(t *testing.T) {
+	store := &memorySessions{user: User{ID: uuid.New(), Login: "fedor", PasswordHash: "encoded"}}
+	service := NewService(store, &recordingVerifier{match: true}, time.Hour)
+	login, err := service.Login(context.Background(), "fedor", "current-password", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := service.ChangePassword(context.Background(), login.Token, "current-password", "new-password-long", time.Now())
+	if err != nil {
+		t.Fatalf("ChangePassword: %v", err)
+	}
+	if !store.revokedAll || store.changedHash != "new-encoded-hash" {
+		t.Fatalf("rotation state=%#v", store)
+	}
+	if result.Token == "" || result.Token == login.Token {
+		t.Fatal("password change did not issue a fresh token")
 	}
 }

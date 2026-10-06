@@ -39,3 +39,26 @@ func (store *PostgresSessionStore) RevokeSession(ctx context.Context, id uuid.UU
 	_, err := store.pool.Exec(ctx, `UPDATE sessions SET revoked_at = $2 WHERE id = $1 AND revoked_at IS NULL`, id, now)
 	return err
 }
+
+func (store *PostgresSessionStore) RevokeAllSessions(ctx context.Context, userID uuid.UUID, now time.Time) error {
+	_, err := store.pool.Exec(ctx, `UPDATE sessions SET revoked_at = $2 WHERE user_id = $1 AND revoked_at IS NULL`, userID, now)
+	return err
+}
+
+func (store *PostgresSessionStore) ChangePasswordAndRotate(ctx context.Context, userID, currentSessionID uuid.UUID, passwordHash string, session Session, now time.Time) error {
+	tx, err := store.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := tx.Exec(ctx, `UPDATE users SET password_hash = $2, updated_at = $3 WHERE id = $1`, userID, passwordHash, now); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE sessions SET revoked_at = $2 WHERE user_id = $1 AND revoked_at IS NULL`, userID, now); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO sessions (id, user_id, token_hash, expires_at, created_at, last_seen_at) VALUES ($1, $2, $3, $4, $5, $5)`, session.ID, session.UserID, session.TokenHash, session.ExpiresAt, now); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}

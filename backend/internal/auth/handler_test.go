@@ -91,3 +91,40 @@ func TestLoginRateLimitIsBounded(t *testing.T) {
 		t.Fatalf("limiter size=%d, want <=1", handler.limiter.Size())
 	}
 }
+
+func TestPasswordChangeRotatesCookie(t *testing.T) {
+	store := &memorySessions{user: User{ID: uuid.New(), Login: "fedor", PasswordHash: "encoded"}}
+	handler := NewHandler(NewService(store, &recordingVerifier{match: true}, time.Hour), false)
+	router := chi.NewRouter()
+	handler.Mount(router)
+	login := httptest.NewRecorder()
+	router.ServeHTTP(login, httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString(`{"login":"fedor","password":"current-password"}`)))
+	oldCookie := login.Result().Cookies()[0]
+	request := httptest.NewRequest(http.MethodPut, "/auth/password", bytes.NewBufferString(`{"current_password":"current-password","new_password":"new-password-long"}`))
+	request.AddCookie(oldCookie)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	newCookies := response.Result().Cookies()
+	if len(newCookies) != 1 || newCookies[0].Value == oldCookie.Value {
+		t.Fatalf("cookie was not rotated: %#v", newCookies)
+	}
+}
+
+func TestLogoutAllRevokesEverySession(t *testing.T) {
+	store := &memorySessions{user: User{ID: uuid.New(), Login: "fedor", PasswordHash: "encoded"}}
+	handler := NewHandler(NewService(store, &recordingVerifier{match: true}, time.Hour), false)
+	router := chi.NewRouter()
+	handler.Mount(router)
+	login := httptest.NewRecorder()
+	router.ServeHTTP(login, httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString(`{"login":"fedor","password":"current-password"}`)))
+	request := httptest.NewRequest(http.MethodPost, "/auth/logout-all", nil)
+	request.AddCookie(login.Result().Cookies()[0])
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusNoContent || !store.revokedAll {
+		t.Fatalf("status=%d revokedAll=%v", response.Code, store.revokedAll)
+	}
+}

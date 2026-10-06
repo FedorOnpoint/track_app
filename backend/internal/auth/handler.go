@@ -27,6 +27,8 @@ func NewHandler(service *Service, secureCookie bool) *Handler {
 func (handler *Handler) Mount(router chi.Router) {
 	router.Post("/auth/login", handler.login)
 	router.Post("/auth/logout", handler.logout)
+	router.With(handler.Require).Post("/auth/logout-all", handler.logoutAll)
+	router.With(handler.Require).Put("/auth/password", handler.changePassword)
 	router.With(handler.Require).Get("/auth/me", handler.me)
 }
 
@@ -72,8 +74,45 @@ func (handler *Handler) logout(writer http.ResponseWriter, request *http.Request
 	if cookie, err := request.Cookie(sessionCookieName); err == nil {
 		_ = handler.service.Logout(request.Context(), cookie.Value, time.Now())
 	}
-	http.SetCookie(writer, &http.Cookie{Name: sessionCookieName, Value: "", Path: "/", HttpOnly: true, Secure: handler.secureCookie, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+	handler.clearSessionCookie(writer)
 	writer.WriteHeader(http.StatusNoContent)
+}
+
+func (handler *Handler) logoutAll(writer http.ResponseWriter, request *http.Request) {
+	cookie, _ := request.Cookie(sessionCookieName)
+	if err := handler.service.LogoutAll(request.Context(), cookie.Value, time.Now()); err != nil {
+		writeAuthError(writer, request, http.StatusInternalServerError, "internal_error", "Не удалось завершить сеансы")
+		return
+	}
+	handler.clearSessionCookie(writer)
+	writer.WriteHeader(http.StatusNoContent)
+}
+
+func (handler *Handler) changePassword(writer http.ResponseWriter, request *http.Request) {
+	var input struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+	if !decodeAuthJSON(writer, request, &input) || len(input.CurrentPassword) < 12 || len(input.CurrentPassword) > 1024 || len(input.NewPassword) < 12 || len(input.NewPassword) > 1024 {
+		writeAuthError(writer, request, http.StatusBadRequest, "validation_error", "Проверьте введённые данные")
+		return
+	}
+	cookie, _ := request.Cookie(sessionCookieName)
+	result, err := handler.service.ChangePassword(request.Context(), cookie.Value, input.CurrentPassword, input.NewPassword, time.Now())
+	if err != nil {
+		if err == ErrInvalidCredentials {
+			writeAuthError(writer, request, http.StatusUnauthorized, "invalid_credentials", "Неверный текущий пароль")
+			return
+		}
+		writeAuthError(writer, request, http.StatusInternalServerError, "internal_error", "Не удалось изменить пароль")
+		return
+	}
+	http.SetCookie(writer, &http.Cookie{Name: sessionCookieName, Value: result.Token, Path: "/", HttpOnly: true, Secure: handler.secureCookie, SameSite: http.SameSiteLaxMode, MaxAge: int(handler.service.ttl.Seconds())})
+	writer.WriteHeader(http.StatusNoContent)
+}
+
+func (handler *Handler) clearSessionCookie(writer http.ResponseWriter) {
+	http.SetCookie(writer, &http.Cookie{Name: sessionCookieName, Value: "", Path: "/", HttpOnly: true, Secure: handler.secureCookie, SameSite: http.SameSiteLaxMode, MaxAge: -1})
 }
 
 func (handler *Handler) me(writer http.ResponseWriter, request *http.Request) {

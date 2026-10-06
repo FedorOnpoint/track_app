@@ -41,10 +41,13 @@ type SessionStore interface {
 	CreateSession(context.Context, Session) error
 	FindUserByTokenHash(context.Context, []byte, time.Time) (UserSession, error)
 	RevokeSession(context.Context, uuid.UUID, time.Time) error
+	RevokeAllSessions(context.Context, uuid.UUID, time.Time) error
+	ChangePasswordAndRotate(context.Context, uuid.UUID, uuid.UUID, string, Session, time.Time) error
 }
 
 type PasswordVerifier interface {
 	Verify(password, encoded string) (bool, error)
+	Hash(password string) (string, error)
 }
 
 type Service struct {
@@ -99,4 +102,39 @@ func (service *Service) Logout(ctx context.Context, plaintext string, now time.T
 		return nil
 	}
 	return service.store.RevokeSession(ctx, userSession.SessionID, now)
+}
+
+func (service *Service) LogoutAll(ctx context.Context, plaintext string, now time.Time) error {
+	userSession, err := service.Authenticate(ctx, plaintext, now)
+	if err != nil {
+		return ErrInvalidCredentials
+	}
+	return service.store.RevokeAllSessions(ctx, userSession.User.ID, now)
+}
+
+func (service *Service) ChangePassword(ctx context.Context, plaintext, currentPassword, newPassword string, now time.Time) (LoginResult, error) {
+	if len(newPassword) < 12 || len(newPassword) > 1024 {
+		return LoginResult{}, ErrInvalidPassword
+	}
+	userSession, err := service.Authenticate(ctx, plaintext, now)
+	if err != nil {
+		return LoginResult{}, ErrInvalidCredentials
+	}
+	matched, err := service.verifier.Verify(currentPassword, userSession.PasswordHash)
+	if err != nil || !matched {
+		return LoginResult{}, ErrInvalidCredentials
+	}
+	newHash, err := service.verifier.Hash(newPassword)
+	if err != nil {
+		return LoginResult{}, err
+	}
+	token, err := GenerateSessionToken()
+	if err != nil {
+		return LoginResult{}, err
+	}
+	newSession := Session{ID: uuid.New(), UserID: userSession.User.ID, TokenHash: token.Hash, ExpiresAt: now.Add(service.ttl)}
+	if err := service.store.ChangePasswordAndRotate(ctx, userSession.User.ID, userSession.SessionID, newHash, newSession, now); err != nil {
+		return LoginResult{}, err
+	}
+	return LoginResult{User: userSession.User, Token: token.Plaintext}, nil
 }
