@@ -14,6 +14,7 @@ import (
 	"github.com/FedorOnpoint/track_app/backend/internal/bookmarks"
 	"github.com/FedorOnpoint/track_app/backend/internal/catalog"
 	"github.com/FedorOnpoint/track_app/backend/internal/catalog/catalogdb"
+	"github.com/FedorOnpoint/track_app/backend/internal/notes"
 	"github.com/FedorOnpoint/track_app/backend/internal/platform/config"
 	"github.com/FedorOnpoint/track_app/backend/internal/platform/database"
 	"github.com/FedorOnpoint/track_app/backend/internal/platform/httpserver"
@@ -60,6 +61,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 			catalog.MountRoutes(protected, catalogQueries)
 			progress.MountRoutes(protected, progress.NewPostgresStore(pool))
 			bookmarks.MountRoutes(protected, bookmarks.NewPostgresStore(pool))
+			notes.MountRoutes(protected, notes.NewPostgresStore(pool))
 		})
 	}))
 	logger.Info("application started", "addr", cfg.Addr, "environment", cfg.Environment)
