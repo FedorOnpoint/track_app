@@ -60,3 +60,12 @@ RETURNING checklist_item_id, completed, updated_at`, userID, slug, itemID, compl
 	err := row.Scan(&result.ChecklistItemID, &result.Completed, &result.UpdatedAt)
 	return result, err
 }
+
+func (store *PostgresStore) RecordTopicVisit(ctx context.Context, userID uuid.UUID, slug string, now time.Time) error {
+	var topicID uuid.UUID
+	return store.db.QueryRow(ctx, `
+INSERT INTO topic_progress (user_id, topic_id, last_opened_at, updated_at)
+SELECT $1, id, $3, $3 FROM topics WHERE slug = $2
+ON CONFLICT (user_id, topic_id) DO UPDATE SET last_opened_at = EXCLUDED.last_opened_at
+RETURNING topic_id`, userID, slug, now).Scan(&topicID)
+}

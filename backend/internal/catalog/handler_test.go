@@ -7,9 +7,12 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/FedorOnpoint/track_app/backend/internal/auth"
 	"github.com/FedorOnpoint/track_app/backend/internal/catalog/catalogdb"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -17,6 +20,17 @@ import (
 type fakeStore struct {
 	listParams catalogdb.ListTopicsParams
 	found      bool
+}
+
+type recordingVisit struct {
+	userID uuid.UUID
+	slug   string
+}
+
+func (visit *recordingVisit) RecordTopicVisit(_ context.Context, userID uuid.UUID, slug string, _ time.Time) error {
+	visit.userID = userID
+	visit.slug = slug
+	return nil
 }
 
 func (store *fakeStore) ListCategories(context.Context) ([]catalogdb.Category, error) {
@@ -107,6 +121,20 @@ func TestTopicDetailContainsCompleteLearningPayload(t *testing.T) {
 		if !strings.Contains(response.Body.String(), field) {
 			t.Errorf("response missing %s: %s", field, response.Body.String())
 		}
+	}
+}
+
+func TestTopicDetailRecordsAuthenticatedVisit(t *testing.T) {
+	visitor := &recordingVisit{}
+	userID := uuid.New()
+	router := chi.NewRouter()
+	MountRoutes(router, &fakeStore{found: true}, visitor)
+	request := httptest.NewRequest(http.MethodGet, "/topics/goroutines", nil)
+	request = request.WithContext(auth.ContextWithUserID(request.Context(), userID))
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || visitor.userID != userID || visitor.slug != "goroutines" {
+		t.Fatalf("status=%d visit=%+v", response.Code, visitor)
 	}
 }
 

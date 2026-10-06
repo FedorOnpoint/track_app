@@ -14,6 +14,7 @@ import (
 	"github.com/FedorOnpoint/track_app/backend/internal/bookmarks"
 	"github.com/FedorOnpoint/track_app/backend/internal/catalog"
 	"github.com/FedorOnpoint/track_app/backend/internal/catalog/catalogdb"
+	"github.com/FedorOnpoint/track_app/backend/internal/dashboard"
 	"github.com/FedorOnpoint/track_app/backend/internal/notes"
 	"github.com/FedorOnpoint/track_app/backend/internal/platform/config"
 	"github.com/FedorOnpoint/track_app/backend/internal/platform/database"
@@ -53,15 +54,17 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	}
 
 	catalogQueries := catalogdb.New(pool)
+	progressStore := progress.NewPostgresStore(pool)
 	authHandler := auth.NewHandler(auth.NewService(auth.NewPostgresSessionStore(pool), auth.NewPasswordService(), cfg.SessionTTL), cfg.Environment == "production")
 	server := httpserver.NewServer(cfg.Addr, httpserver.NewHandler(pool, logger, httpserver.SecurityConfig{Environment: cfg.Environment, Domain: cfg.Domain}, func(router chi.Router) {
 		authHandler.Mount(router)
 		router.Group(func(protected chi.Router) {
 			protected.Use(authHandler.Require)
-			catalog.MountRoutes(protected, catalogQueries)
-			progress.MountRoutes(protected, progress.NewPostgresStore(pool))
+			catalog.MountRoutes(protected, catalogQueries, progressStore)
+			progress.MountRoutes(protected, progressStore)
 			bookmarks.MountRoutes(protected, bookmarks.NewPostgresStore(pool))
 			notes.MountRoutes(protected, notes.NewPostgresStore(pool))
+			dashboard.MountRoutes(protected, dashboard.NewPostgresStore(pool))
 		})
 	}))
 	logger.Info("application started", "addr", cfg.Addr, "environment", cfg.Environment)

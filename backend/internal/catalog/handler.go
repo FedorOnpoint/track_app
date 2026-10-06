@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/FedorOnpoint/track_app/backend/internal/auth"
 	"github.com/FedorOnpoint/track_app/backend/internal/catalog/catalogdb"
 	"github.com/FedorOnpoint/track_app/backend/internal/platform/requestcontext"
 	"github.com/go-chi/chi/v5"
@@ -27,6 +29,10 @@ type Store interface {
 	ListFollowUpQuestions(context.Context, []pgtype.UUID) ([]catalogdb.FollowUpQuestion, error)
 	ListResources(context.Context, pgtype.UUID) ([]catalogdb.ListResourcesRow, error)
 	ListPracticeRecommendations(context.Context, pgtype.UUID) ([]catalogdb.ListPracticeRecommendationsRow, error)
+}
+
+type TopicVisitRecorder interface {
+	RecordTopicVisit(context.Context, uuid.UUID, string, time.Time) error
 }
 
 type responseError struct {
@@ -55,13 +61,17 @@ type topicSummaryDTO struct {
 	CategoryTitle    string `json:"category_title"`
 }
 
-func MountRoutes(router chi.Router, store Store) {
+func MountRoutes(router chi.Router, store Store, recorders ...TopicVisitRecorder) {
+	var recorder TopicVisitRecorder
+	if len(recorders) > 0 {
+		recorder = recorders[0]
+	}
 	router.Get("/categories", listCategories(store))
 	router.Get("/topics", listTopics(store))
-	router.Get("/topics/{slug}", getTopic(store))
+	router.Get("/topics/{slug}", getTopic(store, recorder))
 }
 
-func getTopic(store Store) http.HandlerFunc {
+func getTopic(store Store, recorder TopicVisitRecorder) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		row, err := store.GetTopic(request.Context(), chi.URLParam(request, "slug"))
 		if err != nil {
@@ -71,6 +81,12 @@ func getTopic(store Store) http.HandlerFunc {
 			}
 			writeCatalogError(writer, request, http.StatusInternalServerError, "internal_error", "Не удалось загрузить тему")
 			return
+		}
+		if userID, ok := auth.UserIDFromContext(request.Context()); ok && recorder != nil {
+			if err := recorder.RecordTopicVisit(request.Context(), userID, row.Slug, time.Now().UTC()); err != nil {
+				writeCatalogError(writer, request, http.StatusInternalServerError, "internal_error", "Не удалось открыть тему")
+				return
+			}
 		}
 		sections, checklist, questions, followUps, resources, practice, err := loadTopicParts(request.Context(), store, row.ID)
 		if err != nil {
