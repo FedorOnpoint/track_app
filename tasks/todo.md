@@ -55,7 +55,7 @@
 - [x] T21 Knowledge Map. Acceptance: search/filter/page state synchronized with URL and resettable. Verify: RTL router tests. Depends: T18,T06. Scope: M.
 - [x] T22 Topic content page и safe Markdown. Acceptance: semantic navigation; raw HTML and unsafe links do not execute. Verify: component/security tests. Depends: T18,T07. Scope: M.
 - [x] T23 Topic progress/checklist/bookmark mutations. Acceptance: double submit prevented; optimistic rollback restores exact previous state. Verify: mutation component tests. Depends: T22,T13,T14. Scope: M.
-- [ ] T24 Notes CRUD UI. Acceptance: create/edit/delete confirmation, keyboard access, rollback/error state. Verify: RTL tests. Depends: T22,T15. Scope: M.
+- [x] T24 Notes CRUD UI. Acceptance: create/edit/delete confirmation, keyboard access, rollback/error state. Verify: RTL tests. Depends: T22,T15. Scope: M.
 
 ### Checkpoint E
 

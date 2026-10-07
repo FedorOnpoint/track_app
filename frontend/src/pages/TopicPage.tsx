@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 
+import { TopicNotes } from '../features/notes/TopicNotes'
 import { apiRequest } from '../shared/api/client'
 import type { ApiEnvelope } from '../shared/api/types'
 import { SafeMarkdown } from '../shared/ui/SafeMarkdown'
@@ -116,6 +117,7 @@ export function TopicPage() {
         <section id="questions" aria-labelledby="questions-title"><p className="eyebrow">Собеседование</p><h2 id="questions-title">Типовые вопросы</h2>{data.questions.length === 0 ? <p className="topic-empty">Вопросы пока не добавлены.</p> : <div className="question-list">{data.questions.map((question) => <details key={question.id}><summary>{question.question}</summary><div className="question-answer"><strong>Короткий ответ</strong><SafeMarkdown>{question.short_answer}</SafeMarkdown><strong>Подробно</strong><SafeMarkdown>{question.detailed_answer}</SafeMarkdown>{question.pitfalls && <aside className="pitfall"><strong>Частая ошибка</strong><SafeMarkdown>{question.pitfalls}</SafeMarkdown></aside>}{data.follow_ups.filter((item) => item.interview_question_id === question.id).map((followUp) => <div className="follow-up" key={followUp.id}><strong>{followUp.question}</strong><SafeMarkdown>{followUp.expected_answer}</SafeMarkdown></div>)}</div></details>)}</div>}</section>
         <section id="practice" aria-labelledby="practice-title"><p className="eyebrow">Закрепление</p><h2 id="practice-title">Практика</h2>{data.practice.length === 0 ? <p className="topic-empty">Практика пока не добавлена.</p> : <ul className="practice-list">{data.practice.map((item) => <li key={item.id}><h3>{item.title}</h3><SafeMarkdown>{item.description}</SafeMarkdown><p><strong>Результат:</strong> {item.expected_outcome}</p>{safeExternalURL(item.url) && <a href={safeExternalURL(item.url) ?? undefined} target="_blank" rel="noreferrer noopener">Открыть задание ↗</a>}</li>)}</ul>}</section>
         <section id="resources" aria-labelledby="resources-title"><p className="eyebrow">Первоисточники</p><h2 id="resources-title">Материалы</h2>{data.resources.length === 0 ? <p className="topic-empty">Источники пока не добавлены.</p> : <ul className="resource-list">{data.resources.map((resource) => <li key={resource.id}>{safeExternalURL(resource.url) ? <a href={resource.url} target="_blank" rel="noreferrer noopener"><span><strong>{resource.title}</strong><small>{resource.source_name} · {resource.resource_type}</small></span><span aria-hidden="true">↗</span></a> : <span><strong>{resource.title}</strong><small>Недоступная ссылка</small></span>}</li>)}</ul>}</section>
+        <TopicNotes slug={data.slug} />
       </article>
     </div>
   </main>

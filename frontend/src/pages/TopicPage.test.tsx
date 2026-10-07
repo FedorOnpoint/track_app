@@ -61,6 +61,7 @@ test('prevents duplicate progress submissions while a mutation is pending', asyn
     const url = String(input)
     if (url.includes('/auth/me')) return sessionResponse()
     if (url.endsWith('/topics/goroutines')) return new Response(JSON.stringify({ data: topicFixture() }))
+    if (url.endsWith('/notes') && !init?.method) return new Response(JSON.stringify({ data: [] }))
     if (url.endsWith('/progress')) {
       progressRequests.push(init ?? {})
       return pending.promise
@@ -89,6 +90,7 @@ test('optimistically updates and exactly restores a bookmark after failure', asy
     const url = String(input)
     if (url.includes('/auth/me')) return sessionResponse()
     if (url.endsWith('/topics/goroutines')) return new Response(JSON.stringify({ data: topicFixture() }))
+    if (url.endsWith('/notes')) return new Response(JSON.stringify({ data: [] }))
     if (url.endsWith('/bookmark')) return pending.promise
     return new Response(null, { status: 204 })
   }))
@@ -110,6 +112,7 @@ test('optimistically updates and restores an exact checklist value after failure
     const url = String(input)
     if (url.includes('/auth/me')) return sessionResponse()
     if (url.endsWith('/topics/goroutines')) return new Response(JSON.stringify({ data: topicFixture() }))
+    if (url.endsWith('/notes') && !init?.method) return new Response(JSON.stringify({ data: [] }))
     if (url.includes('/checklist/c1')) {
       checklistRequests.push(init ?? {})
       return pending.promise
@@ -131,9 +134,12 @@ test('optimistically updates and restores an exact checklist value after failure
 })
 
 function mockTopic(data: ReturnType<typeof topicFixture>) {
-  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => String(input).includes('/auth/me')
-    ? sessionResponse()
-    : new Response(JSON.stringify({ data }))))
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input)
+    if (url.includes('/auth/me')) return sessionResponse()
+    if (url.endsWith('/notes')) return new Response(JSON.stringify({ data: [] }))
+    return new Response(JSON.stringify({ data }))
+  }))
 }
 
 function sessionResponse() {
