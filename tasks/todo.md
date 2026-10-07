@@ -65,7 +65,7 @@
 
 - [ ] T25 Track List page. Acceptance: compact responsive table/list, status control, no bulk change. Verify: RTL + responsive browser check. Depends: T18,T17. Scope: M.
 - [x] T26 Bookmarks и Review pages. Acceptance: independent search/filters and direct topic/status actions. Verify: RTL tests. Depends: T18,T17. Scope: M.
-- [ ] T27 Settings page. Acceptance: password form verifies current password; logout-all returns to login. Verify: RTL + API integration flow. Depends: T18,T11. Scope: M.
+- [x] T27 Settings page. Acceptance: password form verifies current password; logout-all returns to login. Verify: RTL + API integration flow. Depends: T18,T11. Scope: M.
 - [ ] T28 Responsive/a11y pass. Acceptance: keyboard navigation, visible focus, semantic landmarks, AA contrast, reduced motion. Verify: automated accessibility + DevTools mobile/keyboard inspection. Depends: T19–T27. Scope: M.
 
 ### Checkpoint F

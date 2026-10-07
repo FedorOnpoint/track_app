@@ -18,8 +18,11 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   const headers = new Headers(init.headers)
   if (init.body !== undefined && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
   const response = await fetch(`/api/v1${path}`, { ...init, headers })
-  if (response.status === 401) window.dispatchEvent(new Event(unauthorizedEvent))
-  if (!response.ok) throw await toApiError(response)
+  if (!response.ok) {
+    const error = await toApiError(response)
+    if (response.status === 401 && error.code !== 'invalid_credentials') window.dispatchEvent(new Event(unauthorizedEvent))
+    throw error
+  }
   if (response.status === 204) return undefined as T
   return response.json() as Promise<T>
 }

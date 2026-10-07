@@ -4,6 +4,7 @@ import { App } from '../App'
 import { DashboardPage } from '../pages/DashboardPage'
 import { TopicPage } from '../pages/TopicPage'
 import { TopicListPage } from '../pages/TopicListPage'
+import { SettingsPage } from '../pages/SettingsPage'
 import { AuthLayout, LoginPage, ProtectedRoute } from './auth'
 import { AppLayout } from './layout'
 
@@ -26,6 +27,7 @@ export const appRoutes: RouteObject[] = [{
           { path: '/track', element: <TopicListPage mode="track" /> },
           { path: '/bookmarks', element: <TopicListPage mode="bookmarks" /> },
           { path: '/review', element: <TopicListPage mode="review" /> },
+          { path: '/settings', Component: SettingsPage },
         ],
       }],
     },

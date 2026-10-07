@@ -15,6 +15,7 @@ export function AppLayout() {
         <NavLink to="/track">Трек</NavLink>
         <NavLink to="/bookmarks">Закладки</NavLink>
         <NavLink to="/review">Повторение</NavLink>
+        <NavLink to="/settings">Настройки</NavLink>
       </nav>
       <button className="profile" type="button" aria-label="Выйти" onClick={() => void logout()}>{user.login.slice(0, 1).toUpperCase()}</button>
     </header>

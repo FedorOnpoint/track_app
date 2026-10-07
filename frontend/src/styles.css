@@ -60,6 +60,8 @@ h1,h2,p { margin-top:0; } h1 { margin-bottom:10px; font:600 clamp(42px,6vw,72px)
 .pagination button { padding:9px 14px; border:1px solid var(--line); background:var(--surface); color:var(--ink); cursor:pointer; }
 .pagination button:disabled { opacity:.45; cursor:not-allowed; }
 .list-controls { display:flex; gap:16px; align-items:end; margin-bottom:24px; }
+.settings-panel { padding:24px; margin-bottom:28px; border:1px solid var(--line); background:var(--surface); }
+.settings-panel>button { padding:12px; border:1px solid var(--line); background:white; cursor:pointer; }
 .list-controls label { display:grid; gap:8px; }
 .list-controls select,.list-controls button,.track-table select { padding:10px; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
 .track-table { width:100%; border-collapse:collapse; margin-bottom:48px; text-align:left; }
