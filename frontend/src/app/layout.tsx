@@ -12,6 +12,8 @@ export function AppLayout() {
       <nav className="main-nav" aria-label="Основная навигация">
         <NavLink to="/" end>Главная</NavLink>
         <NavLink to="/topics">Карта знаний</NavLink>
+        <NavLink to="/track">Трек</NavLink>
+        <NavLink to="/bookmarks">Закладки</NavLink>
         <NavLink to="/review">Повторение</NavLink>
       </nav>
       <button className="profile" type="button" aria-label="Выйти" onClick={() => void logout()}>{user.login.slice(0, 1).toUpperCase()}</button>
