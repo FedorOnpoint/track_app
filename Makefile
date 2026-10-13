@@ -1,6 +1,6 @@
 .NOTPARALLEL:
 
-GO ?= GOTOOLCHAIN=go1.27.1 go
+GO ?= GOTOOLCHAIN=go1.27.2 go
 NODE_RUN ?= npx --yes --package=node@22.22.0 -c
 SEED_FILES ?= seeds/*.v1.json
 
