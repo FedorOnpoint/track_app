@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -28,6 +29,14 @@ func Load(lookup LookupFunc) (Config, error) {
 		DatabaseURL: strings.TrimSpace(lookup("DATABASE_URL")),
 		LogLevel:    valueOrDefault(lookup("LOG_LEVEL"), "info"),
 		SessionTTL:  defaultSessionTTL,
+	}
+	// Hosting platforms assign the listener port; it takes priority over APP_ADDR.
+	if rawPort := strings.TrimSpace(lookup("PORT")); rawPort != "" {
+		port, err := strconv.Atoi(rawPort)
+		if err != nil || port < 1 || port > 65535 {
+			return Config{}, errors.New("invalid PORT: must be an integer between 1 and 65535")
+		}
+		cfg.Addr = ":" + strconv.Itoa(port)
 	}
 
 	var missing []string

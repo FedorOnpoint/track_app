@@ -77,3 +77,34 @@ func TestLoadRejectsInvalidSessionTTL(t *testing.T) {
 		t.Fatalf("Load() error = %v, want invalid SESSION_TTL error", err)
 	}
 }
+
+func TestLoadUsesPlatformPort(t *testing.T) {
+	t.Parallel()
+	for _, port := range []string{"3000", " 4567 "} {
+		values := map[string]string{
+			"APP_ENV": "production", "APP_DOMAIN": "tracker.vercel.app",
+			"DATABASE_URL": "postgres://tracker:password@db.example.com/tracker?sslmode=require",
+			"APP_ADDR":     ":8080", "PORT": port,
+		}
+		got, err := config.Load(func(key string) string { return values[key] })
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := ":" + strings.TrimSpace(port); got.Addr != want {
+			t.Errorf("Addr = %q, want %q", got.Addr, want)
+		}
+	}
+}
+
+func TestLoadRejectsInvalidPlatformPort(t *testing.T) {
+	t.Parallel()
+	for _, port := range []string{"0", "-1", "65536", "http", "3000:8080"} {
+		values := map[string]string{
+			"APP_ENV": "development", "DATABASE_URL": "postgres://localhost/tracker", "PORT": port,
+		}
+		_, err := config.Load(func(key string) string { return values[key] })
+		if err == nil || !strings.Contains(err.Error(), "PORT") {
+			t.Errorf("PORT = %q: error = %v, want invalid PORT error", port, err)
+		}
+	}
+}

@@ -10,6 +10,8 @@
 node_modules/
 dist/
 coverage/
+playwright-report/
+test-results/
 bin/
 *.test
 *.tsbuildinfo
@@ -21,3 +23,12 @@ frontend/vite.config.d.ts
 .DS_Store
 .idea/
 .vscode/
+
+# Local operational artifacts
+.backups/
+__pycache__/
+.tools/
+
+# Vercel local project metadata and Go service build
+.vercel/
+backend/server
