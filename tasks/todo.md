@@ -21,7 +21,7 @@
 
 ### Checkpoint B
 
-- [ ] Catalog API работает на PostgreSQL; migration/seed/filter tests и race suite проходят; пользователь одобрил auth.
+- [x] Catalog API работает на PostgreSQL; migration/seed/filter tests и race suite проходят; пользователь одобрил auth.
 
 ## Этап 3 — аутентификация
 
@@ -59,51 +59,53 @@
 
 ### Checkpoint E
 
-- [ ] Login → search → topic → progress/note/bookmark работает с реальным API; component/build checks проходят.
+- [x] Login → search → topic → progress/note/bookmark работает с реальным API; component/build checks проходят.
 
 ## Этап 6 — дополнительные страницы и accessibility
 
-- [ ] T25 Track List page. Acceptance: compact responsive table/list, status control, no bulk change. Verify: RTL + responsive browser check. Depends: T18,T17. Scope: M.
+- [x] T25 Track List page. Acceptance: compact responsive table/list, status control, no bulk change. Verify: RTL + responsive browser check. Depends: T18,T17. Scope: M.
 - [x] T26 Bookmarks и Review pages. Acceptance: independent search/filters and direct topic/status actions. Verify: RTL tests. Depends: T18,T17. Scope: M.
 - [x] T27 Settings page. Acceptance: password form verifies current password; logout-all returns to login. Verify: RTL + API integration flow. Depends: T18,T11. Scope: M.
-- [ ] T28 Responsive/a11y pass. Acceptance: keyboard navigation, visible focus, semantic landmarks, AA contrast, reduced motion. Verify: automated accessibility + DevTools mobile/keyboard inspection. Depends: T19–T27. Scope: M.
+- [x] T28 Responsive/a11y pass. Acceptance: keyboard navigation, visible focus, semantic landmarks, AA contrast, reduced motion. Verify: automated accessibility + Playwright/Chrome mobile/keyboard inspection (DevTools MCP недоступен). Depends: T19–T27. Scope: M.
 
 ### Checkpoint F
 
-- [ ] Все MVP screens доступны на desktop/mobile; accessibility findings устранены или явно согласованы.
+- [x] Все MVP screens доступны на desktop/mobile; accessibility findings устранены или явно согласованы.
 
 ## Этап 7 — production seed
 
-- [ ] T29 Seed schema validator и external-link checker. Acceptance: required fields/counts/stable keys validated; network failures distinguished from invalid URLs. Verify: fixture tests. Depends: T05. Scope: M.
-- [ ] T30 Go Core category. Verify: schema/editorial/link/idempotency checks. Depends: T29. Scope: M.
-- [ ] T31 Runtime и память category. Verify: те же checks. Depends: T29. Scope: M.
-- [ ] T32 Конкурентность category. Verify: те же checks. Depends: T29. Scope: M.
-- [ ] T33 Standard Library category. Verify: те же checks. Depends: T29. Scope: M.
-- [ ] T34 HTTP и API category. Verify: те же checks. Depends: T29. Scope: M.
-- [ ] T35 PostgreSQL и SQL category. Verify: те же checks. Depends: T29. Scope: M.
-- [ ] T36 Архитектура category. Verify: те же checks. Depends: T29. Scope: M.
-- [ ] T37 Тестирование category. Verify: те же checks. Depends: T29. Scope: M.
-- [ ] T38 Инфраструктура category. Verify: те же checks. Depends: T29. Scope: M.
-- [ ] T39 Production category. Verify: те же checks. Depends: T29. Scope: M.
-- [ ] T40 Безопасность category. Verify: те же checks. Depends: T29. Scope: M.
-- [ ] T41 System Design category. Verify: те же checks. Depends: T29. Scope: M.
-- [ ] T42 Поведение на собеседовании category. Verify: те же checks. Depends: T29. Scope: M.
-- [ ] T43 Cross-category editorial gate. Acceptance: 80–120 complete unique topics, valid primary-source links, no duplicated questions, user data preserved on reseed. Verify: full seed + preservation/link/report tests. Depends: T30–T42. Scope: M.
+- [x] T29 Seed schema validator и external-link checker. Acceptance: required fields/counts/stable keys validated; network failures distinguished from invalid URLs. Verify: fixture tests. Depends: T05. Scope: M.
+- [x] T30 Go Core category. Verify: schema/editorial/link/idempotency checks. Depends: T29. Scope: M.
+- [x] T31 Runtime и память category. Verify: те же checks. Depends: T29. Scope: M.
+- [x] T32 Конкурентность category. Verify: те же checks. Depends: T29. Scope: M.
+- [x] T33 Standard Library category. Verify: те же checks. Depends: T29. Scope: M.
+- [x] T34 HTTP и API category. Verify: те же checks. Depends: T29. Scope: M.
+- [x] T35 PostgreSQL и SQL category. Verify: те же checks. Depends: T29. Scope: M.
+- [x] T36 Архитектура category. Verify: те же checks. Depends: T29. Scope: M.
+- [x] T37 Тестирование category. Verify: те же checks. Depends: T29. Scope: M.
+- [x] T38 Инфраструктура category. Verify: те же checks. Depends: T29. Scope: M.
+- [x] T39 Production category. Verify: те же checks. Depends: T29. Scope: M.
+- [x] T40 Безопасность category. Verify: те же checks. Depends: T29. Scope: M.
+- [x] T41 System Design category. Verify: те же checks. Depends: T29. Scope: M.
+- [x] T42 Поведение на собеседовании category. Verify: те же checks. Depends: T29. Scope: M.
+- [x] T43 Cross-category editorial gate. Acceptance: 80–120 complete unique topics, valid primary-source links, no duplicated questions, user data preserved on reseed. Verify: full seed + preservation/link/report tests. Depends: T30–T42. Scope: M.
 
 ### Checkpoint G
 
 - [ ] Полный seed принят пользователем по категориям; техническая редактура и preservation tests проходят.
 
+Техническая часть Checkpoint G завершена локально: 13 категорий, 82 темы, 330 вопросов; schema/cross-category/editorial checks, 136 ссылок и preservation tests прошли. Пользовательская приёмка остаётся открытой; продолжение локальных этапов разрешено прямой командой пользователя.
+
 ## Этап 8 — production packaging и CI/CD
 
-- [ ] T44 Production images/Caddy. Acceptance: multi-stage, non-root where supported, static frontend, `/api/*` proxy, required headers. Verify: image builds + container inspection. Depends: checkpoints E–G. Scope: M.
-- [ ] T45 Production Compose/jobs. Acceptance: only Caddy publishes 80/443; DB/API internal; healthchecks, volumes, migrate/seed profiles. Verify: `docker compose config` + clean-stack smoke. Depends: T44. Scope: M.
-- [ ] T46 Backup/retention/restore-check. Acceptance: custom-format dump, 7 daily/4 weekly, encrypted external upload adapter, restore into test DB. Verify: generated backup + restore data assertions. Depends: T45 and selected provider. Scope: M.
-- [ ] T47 CI workflow. Acceptance: backend/frontend/sqlc/images/scans are gates and parallel where safe. Verify: local equivalents + workflow syntax/dry-run checks. Depends: all implementation tasks. Scope: M.
-- [ ] T48 CD dry-run workflow. Acceptance: SHA images, least-privilege SSH, backup/migrate/health/smoke gates and app-tag rollback; no destructive DB rollback. Verify: mocked/dry-run job. Depends: T45–T47 and deployment parameters. Scope: M.
-- [ ] T49 Playwright + local production smoke. Acceptance: exact critical flow from spec persists across reload. Verify: `make e2e`, `make smoke`. Depends: T43,T45. Scope: M.
-- [ ] T50 Final review/acceptance matrix. Acceptance: all criteria mapped to fresh evidence; no secrets/open DB ports/suppressed checks. Verify: `make lint test build e2e smoke restore-check` plus security review. Depends: T46–T49. Scope: M.
+- [x] T44 Production images/Caddy. Acceptance: multi-stage, non-root where supported, static frontend, `/api/*` proxy, required headers. Verify: image builds + container inspection. Depends: checkpoints E–G. Scope: M.
+- [x] T45 Production Compose/jobs. Acceptance: only Caddy publishes 80/443; DB/API internal; healthchecks, volumes, migrate/seed profiles. Verify: `docker compose config` + clean-stack smoke. Depends: T44. Scope: M.
+- T46 Резервные копии исключены из текущего объёма по решению пользователя.
+- [x] T47 CI workflow. Acceptance: backend/frontend/sqlc/images/scans are gates and parallel where safe. Verify: local equivalents + workflow syntax/dry-run checks. Depends: all implementation tasks. Scope: M.
+- [x] T48 CD dry-run workflow. Acceptance: SHA images, least-privilege SSH, migrate/health/smoke gates and app-tag rollback; no destructive DB rollback. Verify: mocked/dry-run job. Depends: T45,T47 and deployment parameters. Scope: M.
+- [x] T49 Playwright + local production smoke. Acceptance: exact critical flow from spec persists across reload. Verify: `make e2e`, `make smoke`. Depends: T43,T45. Scope: M.
+- [x] T50 Final review/acceptance matrix. Acceptance: all criteria mapped to fresh evidence; no secrets/open DB ports/suppressed checks. Verify: `make lint test build e2e smoke` plus security review. Depends: T47–T49. Scope: M.
 
 ### Checkpoint H
 
-- [ ] Все acceptance criteria имеют свежие доказательства; реальный deploy ожидает отдельного разрешения и параметров Timeweb/GitHub/S3.
+- [x] Локальная acceptance matrix проверена: backend race/integration, frontend 32 tests, browser/a11y 22 tests, real API/Chrome flow, repeat migrate/bootstrap/seed, restart persistence, lint/staticcheck/sqlc/actionlint/build и HIGH/CRITICAL image scans. CD проверен только в dry-run; Timeweb deploy ожидает выбора параметров и отдельного разрешения.

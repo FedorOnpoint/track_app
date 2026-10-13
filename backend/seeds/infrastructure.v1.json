@@ -1,0 +1,719 @@
+{
+  "version": 1,
+  "category": {
+    "slug": "infrastructure",
+    "title": "Инфраструктура",
+    "description": "Linux, сеть, Docker, Git, конфигурация и воспроизводимая поставка Go-сервисов.",
+    "sort_order": 90
+  },
+  "topics": [
+    {
+      "slug": "infra-linux-processes-signals",
+      "title": "Linux: процессы, файловые дескрипторы и сигналы",
+      "summary": "Понимать lifecycle серверного процесса и границы доступа к файлам и ресурсам.",
+      "difficulty": "intermediate",
+      "sort_order": 10,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "go-functions-defer"
+      ],
+      "sections": [
+        {
+          "heading": "Процесс и ресурсы",
+          "body_markdown": "Процесс имеет адресное пространство, открытые файловые дескрипторы, текущий каталог, environment и идентификаторы пользователя. Дескриптор может ссылаться на файл, socket или pipe; утечка соединений поэтому способна исчерпать лимит открытых файлов. Linux permissions определяют чтение, запись и выполнение для owner, group и others; для directory execute означает возможность прохода. Запуск от root увеличивает последствия ошибки приложения, а корректный непривилегированный user требует заранее настроенных прав на нужные каталоги.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Сигнал не равен успешному shutdown",
+          "body_markdown": "SIGTERM сообщает процессу просьбу завершиться, SIGKILL нельзя перехватить или обработать. Go-приложение использует os/signal или signal.NotifyContext, прекращает приём работы, ждёт завершения текущих операций в пределах budget и закрывает ресурсы. Обработчик сигнала не должен зависнуть навсегда на медленном запросе. Завершение процесса уничтожает память, поэтому незаписанные очереди и фоновые goroutines не становятся надёжными задачами от одного graceful shutdown.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Практическая диагностика",
+          "body_markdown": "ps показывает процесс и его состояние, /proc раскрывает Linux-специфичные сведения, ss помогает увидеть слушающие sockets и соединения. Проверяйте identity процесса, working directory и файловые права, когда файл существует, но приложение его не открывает. Exit status нужен supervisor и CI для различения успеха и отказа; текст ошибки должен быть в stderr без секретов. Для контейнера важен PID 1 и доставка сигнала: exec form запускает приложение без лишнего shell, который может изменить поведение сигналов.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Различаю файл, socket и descriptor.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Проверяю user и права directory.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Различаю SIGTERM и SIGKILL.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Учитываю PID 1 и shutdown budget.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Почему ошибка too many open files не обязательно связана с файлами?",
+          "short_answer": "Sockets тоже занимают descriptors.",
+          "detailed_answer": "Утечки HTTP bodies, соединений и открытых файлов увеличивают их число. Проверьте lifecycle и лимит процесса, прежде чем просто повышать ulimit.",
+          "pitfalls": "Не лечить утечку бесконечным увеличением лимита.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Что делать с background job на SIGTERM?",
+              "expected_answer": "Прекратить приём новых задач, завершить допустимые текущие в пределах deadline и опереться на durable/idempotent протокол для незавершённых.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Можно ли graceful обработать SIGKILL?",
+          "short_answer": "Нет.",
+          "detailed_answer": "SIGKILL завершает процесс без пользовательского обработчика. Supervisor должен сначала дать SIGTERM и ограниченное время, но приложение обязано переживать и внезапное завершение через durable state.",
+          "pitfalls": "Не обещать cleanup после любого сигнала.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Почему файл доступен через cat, но не сервису?",
+          "short_answer": "У процессов могут быть разные user, cwd и права.",
+          "detailed_answer": "Проверьте абсолютный путь, permissions каждого parent directory и identity сервиса. Наличие файла в shell пользователя не подтверждает доступность в контейнере или для service user.",
+          "pitfalls": "Не решать все проблемы chmod 777.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Зачем exec form в Docker CMD?",
+          "short_answer": "Она запускает приложение без промежуточного shell.",
+          "detailed_answer": "Процесс получает ожидаемую роль и сигналы от runtime. Shell form может добавить wrapper и особенности forwarding; конкретный lifecycle нужно проверять остановкой контейнера.",
+          "pitfalls": "Не считать stop всегда мягким и безлимитным.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "signal(7)",
+          "url": "https://man7.org/linux/man-pages/man7/signal.7.html",
+          "resource_type": "documentation",
+          "source_name": "Linux man-pages project",
+          "sort_order": 10
+        },
+        {
+          "title": "os/signal",
+          "url": "https://pkg.go.dev/os/signal",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Остановить сервер сигналом",
+          "description": "Напишите server с NotifyContext, долгим handler и ограниченным shutdown. Запустите непривилегированным user и проверьте SIGTERM, затем SIGKILL и exit status.",
+          "expected_outcome": "Мягкая остановка завершает допустимую работу; внезапная остановка не выдаётся за успешный cleanup.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "infra-network-dns",
+      "title": "Сеть, DNS и диагностика соединения",
+      "summary": "Разделять разрешение имени, установление соединения и протокольный ответ сервиса.",
+      "difficulty": "intermediate",
+      "sort_order": 20,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "infra-linux-processes-signals"
+      ],
+      "sections": [
+        {
+          "heading": "Адрес, порт и путь запроса",
+          "body_markdown": "IP адресует network endpoint, порт различает listeners, а hostname требует DNS-resolution. TCP connection не подтверждает корректность HTTP приложения: после connect возможны TLS failure, timeout headers и ошибка backend. localhost относится к network namespace текущего процесса; внутри container это сам container, а не соседняя БД. Bind на 127.0.0.1 ограничивает доступ loopback, bind на 0.0.0.0 слушает IPv4 interfaces, но фактическую доступность определяют routing, firewall и publication порта.",
+          "sort_order": 10
+        },
+        {
+          "heading": "DNS как отдельный этап",
+          "body_markdown": "Resolver получает адреса hostname через выбранную конфигурацию и кеши. A и AAAA описывают IPv4 и IPv6, CNAME — alias, TTL влияет на кеширование, но не является обещанием мгновенного переключения всех клиентов. Разные процессы и networks могут получать разные ответы. DNS error отличается от connection refused и timeout: первый относится к имени, второй часто к отсутствующему listener, третий требует исследования пути и budget. Не хардкодьте IP сервиса вместо исправления service discovery.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Диагностика слоями",
+          "body_markdown": "Начните с точного hostname и port в конфигурации, затем сравните DNS-resolution, listener и соединение из того же окружения, где работает приложение. dig или getent помогает исследовать имя, ss — listener, curl — HTTP и TLS. Проверяйте proxy environment и certificate hostname, если TCP работает, а HTTPS нет. Go net.Dialer и context позволяют ограничить этап соединения, но общий request deadline должен учитывать весь путь: DNS, connect, handshake, response и чтение body.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Различаю DNS, TCP, TLS и HTTP failures.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Понимаю localhost в container.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Проверяю listener и публикацию порта.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Ограничиваю весь request deadline.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Почему localhost:5432 не подключает API к соседнему container?",
+          "short_answer": "localhost указывает на namespace самого API.",
+          "detailed_answer": "В Compose используйте hostname сервиса БД и внутренний порт. Published host port нужен внешнему клиенту и не является обычным путём между container services.",
+          "pitfalls": "Не открывать БД наружу ради исправления адреса.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Откуда выполнять диагностический curl?",
+              "expected_answer": "Из того же network namespace и с той же конфигурацией доступа, что проблемный процесс; проверка с ноутбука может исследовать другой путь.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Чем connection refused отличается от timeout?",
+          "short_answer": "Refused обычно означает явный отказ, timeout — отсутствие завершения в budget.",
+          "detailed_answer": "Для refused проверьте listener и адрес; timeout может возникнуть из-за firewall, маршрута или перегрузки. Сообщение задаёт направление диагностики, но не доказывает одну причину.",
+          "pitfalls": "Не объявлять любой timeout проблемой DNS.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Гарантирует ли короткий TTL немедленный DNS failover?",
+          "short_answer": "Нет.",
+          "detailed_answer": "Есть кеши resolver, приложения и открытые долгоживущие соединения. Смена ответа не переносит уже созданное TCP connection; failover требует анализа полного поведения клиента.",
+          "pitfalls": "Не обещать точное время восстановления только из TTL.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "TCP connect прошёл, почему HTTPS не работает?",
+          "short_answer": "TLS или HTTP могут отказать позже.",
+          "detailed_answer": "Проверьте trust chain, server name, дату сертификата, handshake timeout и ответ proxy. Разделяйте диагностику этапов вместо увеличения всех timeouts.",
+          "pitfalls": "Не отключать verification как постоянное исправление.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "net package",
+          "url": "https://pkg.go.dev/net",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Docker networking",
+          "url": "https://docs.docker.com/engine/network/",
+          "resource_type": "documentation",
+          "source_name": "Docker",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Разделить четыре отказа",
+          "description": "В локальной Compose-сети воспроизведите неверное имя, закрытый порт, недоверенный TLS и HTTP 500. Запишите наблюдаемые этапы через небольшую Go-команду и curl.",
+          "expected_outcome": "Каждый отказ отнесён к своему этапу, hostname и deadline настроены осмысленно.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "infra-docker-images-compose",
+      "title": "Docker: образ, container, volume и Compose",
+      "summary": "Собирать воспроизводимый образ и отделять runtime state от filesystem контейнера.",
+      "difficulty": "intermediate",
+      "sort_order": 30,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "infra-network-dns"
+      ],
+      "sections": [
+        {
+          "heading": "Образ и изменяемый экземпляр",
+          "body_markdown": "Image состоит из layers и metadata, container запускает процесс с отдельным writable layer. Изменения этого слоя исчезают при удалении экземпляра, поэтому PostgreSQL data directory требует volume или другого durable storage. Volume не является backup: повреждение и ошибочное DELETE изменяют те же данные. Bind mount связывает путь host с container и может скрыть файлы образа. Network и resource isolation не превращают container в виртуальную машину с отдельным kernel.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Сборка и минимальный runtime",
+          "body_markdown": "Multi-stage Dockerfile собирает Go binary в builder и переносит нужные runtime artifacts в финальный image. Размещение dependency manifests до исходников улучшает повторное использование cache, но содержимое слоя и входы должны соответствовать воспроизводимости. Не копируйте .env или credentials в context; .dockerignore уменьшает лишние данные. Non-root user, exec CMD и явные необходимые файлы повышают предсказуемость. Статический binary и CA certificates требуют проверки на реальной конфигурации, а не предположения, что scratch подходит любому проекту.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Compose и readiness",
+          "body_markdown": "Compose задаёт services, networks и volumes. Внутренний hostname сервиса работает через network, а ports публикует listener на host. Базовый depends_on задаёт порядок, но не доказывает готовность приложения; condition service_healthy использует healthcheck, а клиент всё равно должен корректно переживать временный отказ. Разделите build-time arguments и runtime environment. Для обновления используйте определённый image digest или tag с контролируемым смыслом, чтобы rollback возвращал известный artifact.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Различаю image и container state.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Храню БД в durable volume и делаю backup.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Не добавляю secrets в build context.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Не путаю depends_on с полной readiness.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Почему данные пропали после пересоздания container?",
+          "short_answer": "Они находились в writable layer экземпляра.",
+          "detailed_answer": "Для persistent data используйте volume с корректным путём БД. Проверьте mounts до удаления; volume сохраняет состояние, но backup и restore нужны отдельно.",
+          "pitfalls": "Не считать container restart проверкой сохранности при recreate.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Volume заменяет backup?",
+              "expected_answer": "Нет: volume сохраняет текущее состояние, а backup позволяет восстановить более ранние данные и требует проверенного restore.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Зачем multi-stage build?",
+          "short_answer": "Чтобы отделить toolchain сборки от runtime artifacts.",
+          "detailed_answer": "Финальный image содержит binary и нужные runtime files вместо компилятора и исходников. Это уменьшает поверхность и размер, но корректность CA, user и dynamic dependencies нужно проверить.",
+          "pitfalls": "Не обещать работу любого binary в scratch.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Почему API падает несмотря на depends_on database?",
+          "short_answer": "Запуск процесса БД не гарантирует готовое соединение.",
+          "detailed_answer": "Используйте healthcheck и соответствующее условие, а также ограниченное startup/retry поведение клиента. БД может стать недоступной уже после успешного запуска.",
+          "pitfalls": "Не заменять readiness фиксированным sleep.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Можно ли передать secret через Docker ARG?",
+          "short_answer": "Это не безопасный канал для секрета.",
+          "detailed_answer": "Значение может попасть в build history, logs или layers. Для build secrets используйте поддерживаемые secret mounts, runtime secrets доставляйте отдельно от образа.",
+          "pitfalls": "Не удалять secret в позднем слое как гарантию отсутствия.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Docker multi-stage builds",
+          "url": "https://docs.docker.com/build/building/multi-stage/",
+          "resource_type": "documentation",
+          "source_name": "Docker",
+          "sort_order": 10
+        },
+        {
+          "title": "Compose startup order",
+          "url": "https://docs.docker.com/compose/how-tos/startup-order/",
+          "resource_type": "documentation",
+          "source_name": "Docker",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Собрать и пересоздать",
+          "description": "Соберите Go-сервис multi-stage способом, запустите с PostgreSQL и volume в private network. Пересоздайте container БД, проверьте данные и доставку SIGTERM API.",
+          "expected_outcome": "Данные сохранены, БД не публикуется наружу, image не содержит конфигурационных секретов.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "infra-git-workflow",
+      "title": "Git: commits, branches, merge и безопасный рабочий процесс",
+      "summary": "Понимать snapshot model и отделять локальные изменения от опубликованной истории.",
+      "difficulty": "intermediate",
+      "sort_order": 40,
+      "estimated_minutes": 40,
+      "prerequisites": [],
+      "sections": [
+        {
+          "heading": "Working tree, index и commit",
+          "body_markdown": "Working tree содержит текущие файлы, index выбирает snapshot для следующего commit, а commit фиксирует дерево и родителей. git diff показывает незастейдженные изменения, git diff --cached — подготовленный snapshot. Branch является перемещаемой ссылкой на commit, а не копией каталога. Поэтому переключение branch при незакоммиченных изменениях требует понимания состояния; изоляция через worktree помогает отдельным задачам иметь свои каталоги и index.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Merge и rebase",
+          "body_markdown": "Merge сохраняет историю ветвления и может создать commit с двумя родителями. Rebase переносит изменения на новую основу, создавая новые commit identities. Conflict требует понять оба намерения, а не автоматически выбрать ours или theirs. После разрешения проверьте итоговые файлы и тесты. Переписывание опубликованной общей истории затрагивает коллег; force-with-lease проверяет ожидаемый ref, но не делает ненужный rewrite безопасным или согласованным.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Обратимость и обзор",
+          "body_markdown": "Revert создаёт обратное изменение и подходит для общей истории; reset меняет локальную ссылку и в некоторых режимах index и working tree. Перед destructive действием проверяйте status и сохранность работы. Маленькое логически связное изменение легче review и откатить. Не добавляйте secret в commit с мыслью удалить позже: история продолжает хранить его, требуется отзыв credential и отдельная очистка. .gitignore не перестаёт отслеживать файл, который уже в index.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Различаю working tree, index и commit.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Понимаю branch как ref.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Проверяю семантику conflict resolution.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Не переписываю shared history без согласования.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Чем git diff отличается от git diff --cached?",
+          "short_answer": "Первый сравнивает working tree с index, второй index с HEAD.",
+          "detailed_answer": "Два diff могут показывать разные части одного файла. Перед commit нужно review именно staged snapshot, иначе ожидаемые изменения могут не попасть в историю.",
+          "pitfalls": "Не считать git status полным содержимым diff.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Что проверить после разрешения conflict?",
+              "expected_answer": "Итоговую семантику обеих сторон, отсутствие маркеров и релевантные tests; успешный merge сам не доказывает правильность.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Почему rebase меняет commit hashes?",
+          "short_answer": "Создаются новые commits с другими родителями.",
+          "detailed_answer": "Даже аналогичное изменение получает другой identity из-за нового дерева ancestry и metadata. Опубликованные ссылки коллег остаются на прежней истории, что требует координации.",
+          "pitfalls": "Не применять force push как автоматическое продолжение rebase.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Когда revert предпочтительнее reset?",
+          "short_answer": "Когда изменение уже находится в общей истории.",
+          "detailed_answer": "Revert добавляет обратный commit без переписывания ancestry. Reset полезен для осознанного локального изменения ссылок, но hard может уничтожить незакоммиченную работу.",
+          "pitfalls": "Не использовать reset --hard как обычный undo без проверки.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Почему .gitignore не удалил secret из репозитория?",
+          "short_answer": "Он не влияет на уже отслеживаемые файлы и историю.",
+          "detailed_answer": "Удаление из текущего snapshot не отзывает credential и не стирает старые commits. Сначала инвалидируйте секрет, затем согласуйте cleanup; ignore предотвращает будущие случайные добавления.",
+          "pitfalls": "Не считать удалённый файл отозванным секретом.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Git command reference",
+          "url": "https://git-scm.com/docs/git",
+          "resource_type": "documentation",
+          "source_name": "Git project",
+          "sort_order": 10
+        },
+        {
+          "title": "git-rebase documentation",
+          "url": "https://git-scm.com/docs/git-rebase",
+          "resource_type": "documentation",
+          "source_name": "Git project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Разобрать граф истории",
+          "description": "В отдельном учебном repository создайте две ветки с конфликтующим правилом, сравните merge и rebase и разрешите conflict по смыслу. Выполните revert учебного изменения.",
+          "expected_outcome": "Граф родителей и разница identity объяснены; рабочие файлы и staging различаются осознанно.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "infra-configuration-secrets",
+      "title": "Конфигурация, environment и secrets",
+      "summary": "Проверять настройки при запуске и не смешивать публичные параметры с чувствительными данными.",
+      "difficulty": "intermediate",
+      "sort_order": 50,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "go-errors-panic-recover"
+      ],
+      "sections": [
+        {
+          "heading": "Конфигурация как вход приложения",
+          "body_markdown": "Конфигурация задаёт адрес listener, database DSN, timeouts и режим cookies. Environment удобен для передачи runtime values, но все значения приходят строками и требуют parsing и validation. Определите обязательные поля, допустимые диапазоны и приоритет источников; отсутствие timeout не должно молча превращаться в безлимитное ожидание. Ошибка запуска должна назвать проблемный параметр без печати secret. Проверка выполняется до начала обслуживания запросов.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Граница секрета",
+          "body_markdown": "Password, signing key и database credentials нельзя помещать в frontend bundle, image layer или общие logs. Environment сам по себе не secret manager: доступ к процессу, diagnostic output и CI logs может раскрыть значения. Выберите способ доставки согласно платформе, ограничьте доступ и lifecycle. Публичный API URL не является secret, а переменная с красивым именем SECRET не защищается автоматически. Пример конфигурации содержит placeholders и не должен случайно стать production credential.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Изменение и воспроизводимость",
+          "body_markdown": "Зафиксируйте совместимость configuration schema с версиями приложения. Новый обязательный параметр без подготовки deployment ломает rolling update; сначала обеспечьте доставку и безопасный default, если он действительно допустим. Secret rotation требует понять, кто читает значение и когда: на startup или динамически. При отказе БД не выводите DSN в сообщение. Для поддержки можно логировать безопасный набор effective settings, например порт и deadline, отделяя их от чувствительных полей.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Парсю и валидирую env на startup.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Различаю secret и публичный parameter.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Не печатаю DSN целиком.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Планирую rotation и совместимость config.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Достаточно ли хранить password в env?",
+          "short_answer": "Это канал передачи, а не полная защита.",
+          "detailed_answer": "Значение может быть доступно процессным diagnostics и logs. Нужны контроль доступа, redaction, безопасная доставка и возможность rotation согласно окружению.",
+          "pitfalls": "Не объявлять env зашифрованным хранилищем.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Почему rotation не заработала после смены env?",
+              "expected_answer": "Уже запущенный процесс может прочитать значение только на startup; нужен предусмотренный reload или restart и переходная совместимость credentials.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Когда проверять неверный timeout?",
+          "short_answer": "До запуска listener.",
+          "detailed_answer": "Синтаксическая и смысловая validation отличает malformed duration, отрицательное значение и нежелательный zero. Fail-fast предотвращает частично работающее приложение с опасными defaults.",
+          "pitfalls": "Не проглатывать ошибку parsing и использовать zero.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Почему frontend environment нельзя считать приватным?",
+          "short_answer": "Build-time значения могут попасть в доступный пользователю bundle.",
+          "detailed_answer": "Browser исполняет скачанный код и видит включённую конфигурацию. Secrets должны оставаться на сервере; frontend получает только публичные параметры и разрешённые ответы API.",
+          "pitfalls": "Не защищать секрет минификацией.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Как безопасно логировать startup config?",
+          "short_answer": "Выводить разрешённые поля и редактировать чувствительные.",
+          "detailed_answer": "Предпочтителен allowlist публичных значений вместо универсального dump struct. DSN, tokens и passwords исключают независимо от debug режима.",
+          "pitfalls": "Не считать debug logs приватными по умолчанию.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "os environment functions",
+          "url": "https://pkg.go.dev/os#LookupEnv",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "time.ParseDuration",
+          "url": "https://pkg.go.dev/time#ParseDuration",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Проверить config loader",
+          "description": "Реализуйте typed config для port, DSN и request deadline с validation. Проверьте missing, malformed и out-of-range values, а также redaction ошибки подключения.",
+          "expected_outcome": "Неверная config блокирует startup с полезным сообщением; secrets отсутствуют в выводе.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "infra-ci-cd-artifacts",
+      "title": "CI/CD, artifacts и управляемый rollback",
+      "summary": "Связывать проверенный исходный код с поставляемым образом и понимать границы автоматизации.",
+      "difficulty": "intermediate",
+      "sort_order": 60,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "infra-docker-images-compose",
+        "infra-git-workflow",
+        "infra-configuration-secrets"
+      ],
+      "sections": [
+        {
+          "heading": "CI как воспроизводимая проверка",
+          "body_markdown": "Pipeline выполняет сборку и проверки на чистом checkout с фиксированным toolchain и manifests. Backend unit tests, race и PostgreSQL integration отвечают на разные риски; frontend build проверяет типы и asset bundle. Cache ускоряет работу, но не должен подменять установку зависимостей или пропускать проверку изменённого кода. Обязательный job обязан fail при реальной ошибке, а не маскировать её continue-on-error. Локальный успешный запуск остаётся полезным, но не заменяет чистое окружение.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Один artifact от проверки до запуска",
+          "body_markdown": "После проверки собирают artifact, обозначенный digest или неизменяемым version tag. Deployment должен запускать именно этот образ, а не пересобирать тот же branch с новыми dependencies. Provenance и соответствие commit помогают объяснить, какой код находится на сервере. Permissions workflow ограничивают задачей; credentials registry и deployment доставляют отдельно. Pull request от недоверенного fork не должен получать production secrets только ради удобства тестирования.",
+          "sort_order": 20
+        },
+        {
+          "heading": "CD и состояние данных",
+          "body_markdown": "Обновление включает доставку artifact, совместимые migrations, restart и readiness check. Health signal показывает ограниченную готовность, а не доказательство всех бизнес-сценариев. При отказе можно вернуть предыдущий образ, только если он совместим с текущей схемой и конфигурацией. Database rollback может разрушить новые данные, поэтому expand/contract и проверенный backup важнее кнопки отката. Параллельные deployments сериализуют, а budget и observable outcome определяют момент успеха или остановки.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Запускаю проверки на clean checkout.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Продвигаю один идентифицированный artifact.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Ограничиваю workflow permissions и secrets.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Проверяю совместимость rollback со схемой.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Почему rebuild на сервере ухудшает воспроизводимость?",
+          "short_answer": "Он может получить другое окружение и зависимости.",
+          "detailed_answer": "Даже одинаковый branch не обозначает неизменяемый binary. Сборка один раз и доставка digest связывают результат CI с runtime artifact.",
+          "pitfalls": "Не считать latest стабильной версией.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Как защититься от двух simultaneous deployments?",
+              "expected_answer": "Использовать concurrency policy и последовательное изменение состояния сервера; определить, отменяет ли новая операция старую и как проверяется итоговый artifact.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Что проверяет readiness после deployment?",
+          "short_answer": "Конкретные условия готовности обслуживать трафик.",
+          "detailed_answer": "Например, конфигурация валидна и обязательная БД доступна. Это не доказывает каждый endpoint; критический smoke flow дополняет сигнал.",
+          "pitfalls": "Не считать status 200 универсальным подтверждением корректности.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Почему предыдущий image может не дать rollback?",
+          "short_answer": "Схема или config уже стала несовместимой.",
+          "detailed_answer": "Удалённая колонка ломает старый binary. Совместимые этапы migration и явный rollback window дают возможность вернуться без destructive database downgrade.",
+          "pitfalls": "Не запускать down migration автоматически при любом health failure.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Зачем ограничивать permissions GitHub Actions?",
+          "short_answer": "Чтобы job имел только нужные capabilities.",
+          "detailed_answer": "Tests обычно не требуют write repository или deployment credentials. Разделение jobs и условий запуска уменьшает последствия ошибочного или недоверенного кода.",
+          "pitfalls": "Не выдавать secrets fork pull requests без доверенной границы.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "GitHub Actions workflows",
+          "url": "https://docs.github.com/en/actions/writing-workflows/about-workflows",
+          "resource_type": "documentation",
+          "source_name": "GitHub",
+          "sort_order": 10
+        },
+        {
+          "title": "Docker image digests",
+          "url": "https://docs.docker.com/dhi/core-concepts/digests/",
+          "resource_type": "documentation",
+          "source_name": "Docker",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Спроектировать pipeline без deployment",
+          "description": "В учебном проекте настройте jobs build/test/integration и создание versioned image. Смоделируйте несовместимое удаление колонки и выберите expand/contract последовательность.",
+          "expected_outcome": "Artifact однозначно связан с исходником; условия rollback и необходимые permissions названы явно.",
+          "sort_order": 10
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,724 @@
+{
+  "version": 1,
+  "category": {
+    "slug": "go-runtime",
+    "title": "Runtime и память",
+    "description": "Размещение объектов, сборка мусора, планировщик, модель памяти и измерение расходов Go-программ.",
+    "sort_order": 20
+  },
+  "topics": [
+    {
+      "slug": "runtime-stack-escape",
+      "title": "Stack, heap и escape analysis",
+      "summary": "Понимать время жизни значений и проверять решения компилятора вместо правил по синтаксису.",
+      "difficulty": "intermediate",
+      "sort_order": 10,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "go-types-zero-values",
+        "go-functions-defer"
+      ],
+      "sections": [
+        {
+          "heading": "Время жизни важнее синтаксиса",
+          "body_markdown": "Go сохраняет корректность указателей независимо от того, где физически размещено значение. Stack и heap — решения реализации, а не свойства объявлений var и new. Стек принадлежит goroutine и может расти; значение, которое должно жить дольше текущего вызова, требует подходящего хранения. Например, func pointer() *int { x := 7; return &x } корректна: возвращаемый адрес не становится висячим. Компилятор анализирует потоки ссылок и выбирает размещение, учитывая контекст и оптимизации.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Что означает escape",
+          "body_markdown": "Escape analysis исследует, могут ли ссылки покинуть область безопасного времени жизни. Передача указателя сама по себе не означает heap allocation: callee может только прочитать значение. Возврат ссылки, сохранение в глобальное состояние или неизвестный вызов могут изменить решение. Inlining открывает компилятору дополнительный контекст. Большие объекты также могут получить heap-хранение по причинам размера; не обещайте одинаковое поведение для всех версий компилятора и архитектур.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Как проверить гипотезу",
+          "body_markdown": "Запустите go build -gcflags=-m=2 для конкретного package и прочитайте цепочку причины escape, а не только строку moved to heap. Сопоставьте её с benchmark через -benchmem: устранённый compiler escape не всегда означает заметную экономию всей операции. Измеряйте вызывающий код с реалистичными аргументами; dead-code elimination и inlining могут убрать работу в искусственном примере. Уменьшать allocations полезно при доказанном бюджете CPU или памяти, но изменение API ради предположения о stack делает код хрупким.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "lifetime",
+          "text": "Объясняю корректность возврата адреса локального значения.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "syntax",
+          "text": "Не связываю new автоматически с heap.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "analysis",
+          "text": "Читаю причину escape в -m=2.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "measure",
+          "text": "Сравниваю allocations на реальном вызове.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "return-pointer",
+          "question": "Почему возврат &x из функции безопасен?",
+          "short_answer": "Go обеспечивает подходящее время жизни хранения.",
+          "detailed_answer": "Компилятор не оставляет объект в освобождённом stack frame, если ссылка продолжает использоваться. При стандартной реализации это обычно приводит к escape, но конкретное размещение зависит от оптимизаций.",
+          "pitfalls": "Не переносить правило висячего указателя из C.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Можно ли изменить решение без изменения результата функции?",
+              "expected_answer": "Да: изменение вызывающего контекста, inlining или версии компилятора может поменять размещение при прежней семантике.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "new-placement",
+          "question": "Всегда ли new(T) выделяет в heap?",
+          "short_answer": "Нет, синтаксис не фиксирует размещение.",
+          "detailed_answer": "new создаёт указатель на zero value T. Если использование не требует escape и размер допустим, компилятор может разместить объект на стеке или устранить allocation.",
+          "pitfalls": "Не считать наличие *T доказательством heap allocation.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "inline",
+          "question": "Как inlining влияет на escape analysis?",
+          "short_answer": "Открывает использование значения в вызывающей функции.",
+          "detailed_answer": "После встраивания видны потоки ссылок, скрытые границей вызова; allocation может исчезнуть. Проверять результат нужно тем же toolchain и build flags, которыми собирается приложение.",
+          "pitfalls": "Не закреплять оптимизацию как гарантию языка.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "diagnostics",
+          "question": "Достаточно ли -m=2 для оценки памяти endpoint?",
+          "short_answer": "Нет, нужен benchmark и профиль нагрузки.",
+          "detailed_answer": "Диагностика объясняет отдельные решения компилятора. Итоговый endpoint может выделять в JSON, драйвере и middleware; allocs/op и heap profile показывают реальные расходы.",
+          "pitfalls": "Не оптимизировать только самый заметный diagnostic.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Go GC guide: where values live",
+          "url": "https://go.dev/doc/gc-guide",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Compiler command and diagnostics",
+          "url": "https://pkg.go.dev/cmd/compile",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Проверить три способа передачи объекта",
+          "description": "Сравните возврат значения, возврат указателя и передачу указателя функции без сохранения. Соберите с -m=2 и benchmark -benchmem; сохраните результат в sink, чтобы исключить удаление вычисления.",
+          "expected_outcome": "Причина escape объяснена по диагностике; изменения allocations связаны с контекстом использования.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "runtime-allocation-retention",
+      "title": "Allocation и удержание памяти",
+      "summary": "Различать скорость allocations, live heap и удержание большого backing array.",
+      "difficulty": "intermediate",
+      "sort_order": 20,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "go-arrays-slices",
+        "go-maps",
+        "runtime-stack-escape"
+      ],
+      "sections": [
+        {
+          "heading": "Поток и запас памяти",
+          "body_markdown": "Количество выделенных байтов за секунду и объём живых данных отвечают на разные вопросы. Короткоживущие JSON-буферы увеличивают allocation rate и частоту GC; растущий cache удерживает live heap даже при редких новых записях. Метрика RSS включает больше, чем Go heap, и освобождение объекта не требует немедленного возврата страниц ОС. Сначала определите симптом: высокий CPU GC, растущий live set или внешняя память, иначе сокращение одной allocation на запрос может не изменить проблему.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Ссылки удерживают больше, чем видно",
+          "body_markdown": "Небольшой subslice может удерживать весь backing array: keep := huge[:16] сохраняет связь с огромным буфером. Если нужны только эти байты на долгий срок, скопируйте их в отдельный массив через bytes.Clone или append([]byte(nil), keep...). Аналогичный эффект возможен у substring. У slice указателей удалённый элемент за len может оставаться в backing array: очистите неиспользуемую область, когда она доступна. Удаление записи cache должно устранять все удерживающие ссылки, включая goroutines и closures.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Оптимизация с бюджетом",
+          "body_markdown": "Заранее задавайте capacity, когда размер известен и ограничен, но не резервируйте максимальный input каждому запросу. sync.Pool уменьшает часть повторных allocations и может отбросить элементы в любой момент; это не cache и не ограничитель памяти. Большой буфер, попавший в pool, способен ухудшить удержание, поэтому полезен предел размера возврата. Сравните alloc_space с inuse_space в heap profile: первый показывает накопленные выделения, второй — ещё живые объекты. Проверяйте latency и пик памяти, а не только allocs/op.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "rate",
+          "text": "Различаю allocation rate и live heap.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "backing",
+          "text": "Распознаю удержание backing array subslice.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "profiles",
+          "text": "Сравниваю alloc_space и inuse_space.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "pool",
+          "text": "Ограничиваю размеры объектов в pool.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "subslice",
+          "question": "Почему 16 байтов slice удерживают мегабайты?",
+          "short_answer": "Slice ссылается на исходный backing array.",
+          "detailed_answer": "GC видит достижимый массив и не освобождает его из-за малой длины slice. Независимая копия полезна при длительном хранении малого фрагмента.",
+          "pitfalls": "Не приравнивать len к удержанной памяти.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Всегда ли копирование subslice выгодно?",
+              "expected_answer": "Нет: короткое время жизни или почти полный массив могут сделать копию лишней; решение зависит от размера и срока хранения.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "rss",
+          "question": "Почему RSS не падает сразу после GC?",
+          "short_answer": "Освобождённые Go-объекты и страницы ОС — разные уровни.",
+          "detailed_answer": "Runtime может сохранять свободные spans для будущих allocations и возвращать память ОС постепенно. RSS также включает stacks, runtime metadata и другие отображения.",
+          "pitfalls": "Не объявлять memory leak по одной точке RSS.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "pool-cache",
+          "question": "Подходит ли sync.Pool для обязательного cache?",
+          "short_answer": "Нет, элементы могут быть удалены runtime.",
+          "detailed_answer": "Pool предназначен для переиспользования временных объектов; Get вправе получить nil. Для cache нужны явные срок жизни, ограничения и политика удаления.",
+          "pitfalls": "Не хранить в pool ресурс, доступность которого требуется бизнес-логике.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "profile-kind",
+          "question": "Какой профиль искать при растущем cache?",
+          "short_answer": "Начните с inuse_space и удерживающих ссылок.",
+          "detailed_answer": "alloc_space полезен для затрат выделения, но рост живых объектов лучше отражает inuse_space после сопоставимых фаз нагрузки и GC.",
+          "pitfalls": "Не смешивать накопленные allocations и утечку live heap.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Go GC guide",
+          "url": "https://go.dev/doc/gc-guide",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "sync.Pool contract",
+          "url": "https://pkg.go.dev/sync#Pool",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Найти удержание в cache",
+          "description": "Сохраните короткие фрагменты крупных []byte в cache, снимите heap profile, затем замените их независимыми копиями. Сравните inuse_space после одинаковых фаз нагрузки.",
+          "expected_outcome": "Размер retained heap сокращён с объяснением trade-off дополнительного копирования.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "runtime-gc-budget",
+      "title": "GC, GOGC и memory limit",
+      "summary": "Настраивать компромисс CPU/память и понимать мягкий предел runtime.",
+      "difficulty": "intermediate",
+      "sort_order": 30,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "runtime-allocation-retention"
+      ],
+      "sections": [
+        {
+          "heading": "Достижимость и стоимость",
+          "body_markdown": "Сборщик стандартного Go runtime определяет живые объекты по достижимости от roots: stacks, globals и других runtime-ссылок. Цикл ссылок без пути от roots не делает объекты бессмертными. Работа маркировки зависит от live heap и структуры указателей; allocations задают частоту циклов. Параллельная работа GC не означает отсутствие пауз: некоторые переходы требуют остановки мира, а goroutines могут выполнять assist. Конкретный алгоритм является деталью toolchain, а не требованием спецификации языка.",
+          "sort_order": 10
+        },
+        {
+          "heading": "GOGC как компромисс",
+          "body_markdown": "GOGC задаёт целевой рост heap относительно живых данных и roots согласно модели runtime. При более высоком значении обычно уменьшается частота GC ценой дополнительной памяти; низкое значение экономит heap, но может увеличивать CPU и задержки. Значение 100 не означает, что процесс займёт ровно два размера текущего heap или что сборка запускается только по одному порогу. Pacing, workload и memory limit взаимодействуют. Сначала уменьшите лишние allocations и удержание, затем сравните настройки на одинаковой нагрузке.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Мягкий memory limit",
+          "body_markdown": "GOMEMLIMIT или debug.SetMemoryLimit задаёт мягкий предел управляемой runtime памяти, включая heap и другую учитываемую память; это не лимит RSS всего процесса. Память C, некоторые отображения и внешние расходы требуют отдельного запаса. Runtime может превышать предел, чтобы не тратить почти весь CPU на бесконечный GC, особенно когда live set больше бюджета. Поэтому контейнеру нужен запас до hard limit, а приложению — ограничение cache и числа активных операций. Сопоставляйте GC CPU, live heap, latency и события OOM.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "roots",
+          "text": "Объясняю достижимость и сборку циклов.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "gogc",
+          "text": "Описываю компромисс GOGC.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "limit",
+          "text": "Отличаю мягкий runtime limit от RSS/cgroup limit.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "capacity",
+          "text": "Оставляю запас и ограничиваю live set.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "cycles",
+          "question": "Соберёт ли GC недостижимый цикл объектов?",
+          "short_answer": "Да, достижимость важнее цикличности.",
+          "detailed_answer": "Tracing GC начинает обход от roots. Взаимные ссылки внутри компоненты без входящего пути от roots не делают её живой.",
+          "pitfalls": "Не описывать Go GC как простой reference counter.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Что делать, если live set больше memory limit?",
+              "expected_answer": "Уменьшить удержание или повысить доступный бюджет; более частый GC не может удалить достижимые данные.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "gogc-up",
+          "question": "Что вероятно изменится при увеличении GOGC?",
+          "short_answer": "Меньше циклов при большем бюджете heap.",
+          "detailed_answer": "Это типичный компромисс CPU и памяти при сопоставимом workload; memory limit может ограничить результат, а latency нужно измерить.",
+          "pitfalls": "Не обещать линейное изменение времени ответа.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "hard-limit",
+          "question": "Защищает ли GOMEMLIMIT от любого OOM?",
+          "short_answer": "Нет, предел мягкий и не покрывает всю память процесса.",
+          "detailed_answer": "Live set может быть больше бюджета, а внешние allocations не учитываются полностью. Hard limit контейнера остаётся отдельным ограничением.",
+          "pitfalls": "Не ставить GOMEMLIMIT равным контейнерному лимиту без запаса.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "assist",
+          "question": "Почему запрос замедляется во время GC без длинной pause?",
+          "short_answer": "Он может выполнять mark assist и конкурировать за CPU.",
+          "detailed_answer": "Высокая скорость allocations требует дополнительной работы маркировки. Короткие STW паузы не исключают заметную суммарную стоимость GC.",
+          "pitfalls": "Не оценивать GC только по максимальной STW pause.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "GC guide and memory limit",
+          "url": "https://go.dev/doc/gc-guide",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "debug.SetMemoryLimit",
+          "url": "https://pkg.go.dev/runtime/debug#SetMemoryLimit",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Сравнить GC budget",
+          "description": "Нагрузите сервис короткоживущими allocations и ограниченным cache. Сравните GOGC 50 и 200, затем добавьте memory limit ниже пикового расхода, но выше live set.",
+          "expected_outcome": "График CPU/heap/latency показывает компромисс без обещания жёсткой защиты от OOM.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "runtime-scheduler-gmp",
+      "title": "Scheduler, GMP и GOMAXPROCS",
+      "summary": "Различать goroutine, OS thread и ресурс выполнения, не полагаясь на порядок планирования.",
+      "difficulty": "intermediate",
+      "sort_order": 40,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "go-functions-defer"
+      ],
+      "sections": [
+        {
+          "heading": "Модель выполнения",
+          "body_markdown": "В модели стандартного runtime G обозначает goroutine, M — поток ОС, P — ресурс, необходимый для выполнения Go-кода. Runnable goroutines ожидают в очередях, а runtime распределяет их по доступным P. Это объяснительная модель реализации: язык гарантирует конкурентное выполнение, но не фиксирует алгоритм очередей, размер stack или порядок выбора. GOMAXPROCS ограничивает количество потоков, одновременно выполняющих пользовательский Go-код; он не ограничивает количество созданных goroutines или всех OS threads.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Блокировки разного рода",
+          "body_markdown": "Goroutine, ожидающая channel, timer или поддерживаемую network operation, обычно паркуется, позволяя исполнять другие задачи. Блокирующий syscall может занять M, при этом runtime способен передать P другому потоку. Поэтому тысяча ожидающих HTTP-запросов не требует тысячу постоянно активных потоков, но каждый запрос всё равно расходует память и ресурсы. CPU-bound задачи конкурируют за P; запуск дополнительной goroutine сам по себе не ускоряет вычисление при насыщенном CPU.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Настройка и наблюдение",
+          "body_markdown": "Проверяйте эффективный GOMAXPROCS в своей версии и окружении: стандартный runtime учитывает платформу, настройки и ограничения доступного CPU, но override меняет поведение. Не кодируйте число CPU контейнера через предположение о runtime.NumCPU. Scheduler не обещает честный порядок completion; для порядка используйте явные протоколы. Execution trace помогает отличить время runnable от блокировки и работы CPU. Ограничьте параллелизм задач по ресурсному бюджету, затем измерьте throughput и tail latency при конкуренции.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "gmp",
+          "text": "Различаю G, M и P.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "procs",
+          "text": "Объясняю границы GOMAXPROCS.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "blocking",
+          "text": "Различаю park и блокирующий syscall.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "trace",
+          "text": "Проверяю конкуренцию и задержки trace.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "thread-limit",
+          "question": "Ограничивает ли GOMAXPROCS число OS threads?",
+          "short_answer": "Нет, ограничивается одновременное выполнение Go-кода.",
+          "detailed_answer": "Потоки нужны также для syscalls и работы runtime. Число M может быть больше числа P; количество G ограничивается ресурсами приложения.",
+          "pitfalls": "Не считать GOMAXPROCS глобальным лимитом потоков.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Почему один P не предотвращает data race?",
+              "expected_answer": "Goroutines всё ещё чередуются; без happens-before доступ остаётся гонкой, даже если физически исполняется последовательно.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "io-cpu",
+          "question": "Почему IO-задач может быть больше числа P?",
+          "short_answer": "Ожидающие IO goroutines не обязаны занимать P.",
+          "detailed_answer": "Runtime паркует поддерживаемые network waits и использует готовность дескрипторов. Активная обработка ответа затем снова конкурирует за выполнение.",
+          "pitfalls": "Не переносить это объяснение на любой сторонний блокирующий вызов.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "fairness",
+          "question": "Можно ли ожидать завершения goroutines в порядке запуска?",
+          "short_answer": "Нет, такого контракта нет.",
+          "detailed_answer": "Порядок зависит от доступности, блокировок и scheduler. Для последовательного результата нумеруйте jobs и собирайте ответы явно.",
+          "pitfalls": "Не использовать time.Sleep как средство задания порядка.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "cpu-pool",
+          "question": "Нужно ли запускать тысячу workers для CPU-bound задачи?",
+          "short_answer": "Обычно нужен ограниченный параллелизм и измерение.",
+          "detailed_answer": "Избыточные runnable задачи добавляют переключения и удержание данных. Оптимальное число зависит от CPU quota и соседних задач, а не только от количества cores хоста.",
+          "pitfalls": "Не выбирать pool size по максимальному числу requests.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "runtime package",
+          "url": "https://pkg.go.dev/runtime",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "runtime implementation: HACKING",
+          "url": "https://go.dev/src/runtime/HACKING.md",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Измерить насыщение CPU",
+          "description": "Запустите ограниченное число CPU jobs при GOMAXPROCS 1 и 2, затем увеличьте workers. Снимите trace и сравните throughput со временем runnable.",
+          "expected_outcome": "Вывод разделяет параллельное выполнение, конкурентность и scheduler overhead.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "runtime-memory-races",
+      "title": "Memory model, happens-before и data races",
+      "summary": "Объяснять публикацию данных через синхронизацию и пределы race detector.",
+      "difficulty": "intermediate",
+      "sort_order": 50,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "go-types-zero-values",
+        "go-maps"
+      ],
+      "sections": [
+        {
+          "heading": "Что является гонкой",
+          "body_markdown": "Data race возникает при конкурентных обращениях к одной области памяти, если хотя бы одно — запись, а обращения не упорядочены синхронизацией и не являются подходящими atomic operations. Совпадение результата в сотне запусков ничего не доказывает: scheduler и компилятор могут менять наблюдаемое поведение. Модель памяти Go даёт простое рассуждение для программ без гонок: их поведение согласуется с последовательным чередованием goroutines. Не проектируйте протокол на том, что конкретный CPU сейчас случайно видит запись.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Публикация через happens-before",
+          "body_markdown": "Например, producer записывает x = 42, затем close(done); consumer получает из закрытого done и читает x. Закрытие channel синхронизировано с receive, который наблюдает закрытие, поэтому запись опубликована. Mutex.Unlock упорядочивается перед соответствующим последующим Lock. Сам запуск goroutine публикует предшествующие записи в неё, но её завершение не публикует результат обратно без дополнительного события. time.Sleep и runtime.Gosched не являются synchronization primitives.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Детектор и границы доказательства",
+          "body_markdown": "go test -race инструментирует выполняемые обращения и ищет наблюдавшиеся несинхронизированные пары. Он полезен в unit и integration сценариях с реальной конкуренцией, но не исследует все возможные interleavings и не заменяет proof владения. Отсутствие отчёта означает только отсутствие найденной гонки в конкретном запуске. Atomic load/store отдельного поля не защищает составной invariant двух полей; нужны общий lock, immutable snapshot или корректный atomic-протокол. Data race и deadlock — разные классы ошибок.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "definition",
+          "text": "Определяю конфликтующий доступ и отсутствие happens-before.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "publication",
+          "text": "Публикую результат через channel или lock.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "sleep",
+          "text": "Не использую Sleep как синхронизацию.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "detector",
+          "text": "Объясняю ограничение покрытия -race.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "flag",
+          "question": "Почему флаг ready после записи payload может быть гонкой?",
+          "short_answer": "Обычные записи и чтения не создают happens-before.",
+          "detailed_answer": "Consumer может конкурентно читать ready и payload. Нужна синхронизация публикации; обычный bool не гарантирует видимость связанных данных.",
+          "pitfalls": "Не ссылаться на порядок строк как порядок наблюдения другой goroutine.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Можно ли безопасно читать неизменяемую map из нескольких goroutines?",
+              "expected_answer": "Да, после корректной публикации и без конкурентных записей; изменяемая map требует защиты.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "done",
+          "question": "Как close(done) публикует результат?",
+          "short_answer": "Receive, наблюдающий закрытие, синхронизируется с close.",
+          "detailed_answer": "Записи перед close предшествуют чтениям после такого receive. Producer должен владеть закрытием, а последующие изменения результата требуют новой защиты.",
+          "pitfalls": "Не продолжать изменять опубликованный payload без защиты.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "negative-race",
+          "question": "Доказывает ли чистый -race безопасность?",
+          "short_answer": "Нет, детектор проверяет выполненные пути.",
+          "detailed_answer": "Редкая ветка или interleaving могут не попасть в запуск. Объяснение владения и synchronization edges остаётся обязательным.",
+          "pitfalls": "Не превращать результат теста в доказательство всех schedules.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "multi-atomic",
+          "question": "Достаточно ли двух atomic полей для баланса?",
+          "short_answer": "Нет, составной invariant требует общего протокола.",
+          "detailed_answer": "Независимые атомарные операции могут дать читателю несовместимую пару значений. Lock или атомарная публикация целого immutable snapshot решают другую задачу.",
+          "pitfalls": "Не путать отсутствие race с логической корректностью.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Go memory model",
+          "url": "https://go.dev/ref/mem",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Data race detector",
+          "url": "https://go.dev/doc/articles/race_detector",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Исправить unsafe publication",
+          "description": "Создайте producer с payload и ready, воспроизведите гонку -race, замените флаг channel закрытия. Отдельно объясните, какие записи публикуются и почему.",
+          "expected_outcome": "После исправления сценарий проходит -race, а корректность обоснована happens-before, не задержкой.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "runtime-profiling",
+      "title": "CPU, heap, block profiles и execution trace",
+      "summary": "Выбирать диагностический инструмент по симптому и проверять эффект оптимизации.",
+      "difficulty": "intermediate",
+      "sort_order": 60,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "runtime-gc-budget",
+        "runtime-scheduler-gmp"
+      ],
+      "sections": [
+        {
+          "heading": "CPU и память отвечают на разные вопросы",
+          "body_markdown": "CPU profile семплирует выполнение и показывает, где потрачено процессорное время; ожидающий IO endpoint может быть медленным и почти отсутствовать в CPU top. Heap profile показывает sampled allocations: alloc_space помогает найти суммарные расходы, inuse_space — удержанные объекты. Сравнивайте одинаковую нагрузку, длительность и phase; разница между профилями разных сценариев часто объясняется входом, а не оптимизацией. Call graph полезнее одиночной функции с высоким flat: он показывает вызывающий путь и cumulative cost.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Блокировки и timeline",
+          "body_markdown": "Block profile помогает искать ожидания synchronization primitives, mutex profile — contention locks, но сбор некоторых профилей требует явного включения sampling и добавляет расходы. Execution trace раскрывает timeline goroutines, syscalls, GC и планирования. Он полезен, когда нужно понять, почему запрос ждал, а не где происходили вычисления. Не включайте максимально подробный сбор бесконечно в production без оценки объёма и overhead; ограничьте окно и выберите репрезентативный период нагрузки.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Диагностика как эксперимент",
+          "body_markdown": "Начните с симптома и baseline: например, p99 вырос при неизменном throughput. Снимите CPU и trace, сформулируйте одну гипотезу и измените узкий участок. После изменения повторите измерение, включая CPU, память и latency: ускорение CPU может увеличить live heap. pprof HTTP handlers должны быть доступны только в защищённой служебной сети, поскольку раскрывают детали процесса. Профиль является наблюдением, а не автоматическим доказательством причины; учитывайте sampling, прогрев и фоновые операции.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "choice",
+          "text": "Выбираю CPU, heap или trace по симптому.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "flat",
+          "text": "Различаю flat и cumulative cost.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "overhead",
+          "text": "Контролирую sampling и окно сбора.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "compare",
+          "text": "Сравниваю before/after при одной нагрузке.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "io-profile",
+          "question": "Почему медленный IO handler не виден в CPU profile?",
+          "short_answer": "Ожидание не является выполнением CPU.",
+          "detailed_answer": "Семплы собираются у выполняющихся задач. Для ожиданий пригодятся trace, timing этапов и профили блокировок в подходящих случаях.",
+          "pitfalls": "Не заключать, что handler быстрый по отсутствию CPU samples.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Что измерить после устранения contention?",
+              "expected_answer": "Throughput, tail latency, CPU и память: больше активной работы может перенести bottleneck и увеличить удержание.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "flat-cum",
+          "question": "Что означает высокий cumulative cost?",
+          "short_answer": "Затраты функции вместе с вызываемыми потомками.",
+          "detailed_answer": "Flat показывает работу непосредственно в функции, cumulative — весь подграф вызовов. Оптимизация dispatcher без изменения дорогого дочернего пути может ничего не дать.",
+          "pitfalls": "Не суммировать cumulative по всем узлам как независимые расходы.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "heap-sample",
+          "question": "Показывает ли heap profile каждый объект?",
+          "short_answer": "Нет, allocations обычно семплируются.",
+          "detailed_answer": "Он хорошо показывает крупные источники и тенденции, но единичный объект может не попасть в sample. Проверьте параметры sampling и повторяемость результата.",
+          "pitfalls": "Не считать числа профиля точной инвентаризацией всех allocations.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "pprof-access",
+          "question": "Почему нельзя публиковать /debug/pprof для всех?",
+          "short_answer": "Он раскрывает процесс и позволяет запускать дорогой сбор.",
+          "detailed_answer": "Stack traces, names и profile data могут содержать чувствительный контекст. Изолируйте endpoint и ограничьте доступ/длительность сбора.",
+          "pitfalls": "Не считать obscurity URL защитой.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Diagnostics",
+          "url": "https://go.dev/doc/diagnostics",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "runtime/pprof",
+          "url": "https://pkg.go.dev/runtime/pprof",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Разобрать contention",
+          "description": "Создайте benchmark cache с общим mutex и дорогой работой под lock. Снимите mutex profile и trace, сократите critical section и повторите нагрузку.",
+          "expected_outcome": "Улучшение подтверждено latency/throughput; риск доступа к данным вне lock проверен отдельно.",
+          "sort_order": 10
+        }
+      ]
+    }
+  ]
+}

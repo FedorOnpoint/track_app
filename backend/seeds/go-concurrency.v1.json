@@ -1,0 +1,724 @@
+{
+  "version": 1,
+  "category": {
+    "slug": "go-concurrency",
+    "title": "Конкурентность",
+    "description": "Жизненный цикл goroutines, каналы, cancellation, синхронизация и ограниченные параллельные протоколы.",
+    "sort_order": 30
+  },
+  "topics": [
+    {
+      "slug": "goroutines",
+      "title": "Goroutines и предотвращение leaks",
+      "summary": "Давать каждой goroutine владельца, условие выхода и способ дождаться завершения.",
+      "difficulty": "intermediate",
+      "sort_order": 10,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "go-functions-defer",
+        "go-errors-panic-recover"
+      ],
+      "sections": [
+        {
+          "heading": "Владение задачей",
+          "body_markdown": "Оператор go запускает функцию конкурентно; он не возвращает handle, результат или автоматическую ошибку. Lifecycle нужно проектировать явно: кто запускает, кто отменяет, кто ожидает и куда поступает результат. Завершение main завершает процесс без ожидания фоновых goroutines. Request-scoped задача обычно должна закончиться вместе с запросом, а долгоживущий background worker принадлежит service lifecycle. Нельзя оставлять работу в неопределённом состоянии лишь потому, что goroutine дешёвая.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Где появляется leak",
+          "body_markdown": "Goroutine leak — задача, которая больше не нужна, но не может выйти: например, producer заблокирован на отправке после ухода consumer. Stack и захваченные references продолжают удерживать данные. Для каждой потенциально бесконечной операции задайте альтернативу отмены: select { case out <- v: case <-ctx.Done(): return }. Если вызываемая библиотека блокирует без поддержки context или deadline, один context снаружи не остановит её; нужны иной API или управление соответствующим ресурсом.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Завершение и диагностика",
+          "body_markdown": "Отмена — просьба прекратить работу, ожидание — подтверждение завершения. После cancel дождитесь worker через done/WaitGroup, чтобы избежать записи после освобождения зависимостей. panic в worker не ловится recover другой goroutine: recovery boundary должен находиться в той же goroutine и не превращать ошибку в скрытый success. Для поиска leaks сравните goroutine profiles в сопоставимых фазах, проверьте stacks ожиданий и сделайте повторные start/stop циклы. Количество goroutines само по себе не доказывает leak, если workload ещё активен.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "owner",
+          "text": "Указываю владельца каждой фоновой задачи.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "exit",
+          "text": "Проверяю условие выхода из каждого blocking point.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "join",
+          "text": "Разделяю cancel и ожидание завершения.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "panic",
+          "text": "Помню границу recover внутри goroutine.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "cancel-join",
+          "question": "Почему cancel() не заменяет Wait?",
+          "short_answer": "Отмена не подтверждает фактическое завершение.",
+          "detailed_answer": "Worker получает сигнал и должен дойти до проверки, завершить cleanup и выйти. До join зависимые ресурсы могут ещё использоваться.",
+          "pitfalls": "Не закрывать database pool сразу после cancel фоновых операций.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Что измерить в тесте start/stop?",
+              "expected_answer": "Повторное завершение всех запущенных workers и отсутствие оставшихся blocking paths, а не только ответ cancel().",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "send-leak",
+          "question": "Как producer зависает после ухода consumer?",
+          "short_answer": "Блокируется на отправке без читателя.",
+          "detailed_answer": "Unbuffered channel ждёт receive; заполненный buffered channel тоже блокирует. Отправка должна наблюдать cancellation, а ownership закрытия — быть явным.",
+          "pitfalls": "Не считать произвольный буфер универсальной защитой.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "panic-worker",
+          "question": "Поймает ли recover в main panic worker?",
+          "short_answer": "Нет, recover действует в своей goroutine.",
+          "detailed_answer": "Нужен deferred recovery непосредственно в boundary worker. После panic состояние могло быть повреждено, поэтому продолжение требует осмысленной политики.",
+          "pitfalls": "Не подавлять panic без reporting и решения о завершении.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "ctx-block",
+          "question": "Остановит ли context произвольный syscall?",
+          "short_answer": "Нет, операция должна поддерживать отмену.",
+          "detailed_answer": "Context передаёт сигнал; реализация IO должна слушать его или использовать deadlines/закрытие ресурса. Обёртка с новой goroutine может лишь перенести leak.",
+          "pitfalls": "Не обещать принудительное убийство goroutine.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Effective Go: goroutines",
+          "url": "https://go.dev/doc/effective_go#goroutines",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "context package",
+          "url": "https://pkg.go.dev/context",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Исправить producer leak",
+          "description": "Запустите producer и consumer, остановите consumer после одного элемента, добавьте cancellation-aware send и done. Проверьте многократный start/cancel/join.",
+          "expected_outcome": "Ни один worker не остаётся ждать отправку после завершения сценария.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "concurrency-channels-select",
+      "title": "Channels, select и закрытие",
+      "summary": "Строить протокол передачи данных с явным владельцем close и поведением nil channels.",
+      "difficulty": "intermediate",
+      "sort_order": 20,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "goroutines"
+      ],
+      "sections": [
+        {
+          "heading": "Канал как протокол",
+          "body_markdown": "Unbuffered channel связывает send и receive, buffered допускает ограниченное число сообщений в очереди. Буфер меняет backpressure, но не ownership payload: отправка pointer или slice не делает глубокую копию. Если producer продолжает менять переданный объект, нужна дополнительная синхронизация или передача исключительного владения. Передача по channel создаёт определённые memory-model связи; понимать их полезнее, чем считать канал магическим общим lock для всех данных приложения.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Close и nil",
+          "body_markdown": "Обычно channel закрывает сторона, которая знает, что больше не будет sends. Получатели используют v, ok := <-ch или range; после исчерпания буфера закрытый канал выдаёт zero value и ok=false. Send в закрытый канал и повторный close вызывают panic. Receive/send nil channel блокируются навсегда, а в select такая ветка отключена. Это удобно при fan-in: после закрытия одного входа присвойте ему nil, чтобы готовая ветка не вращалась бесконечно. Закрытие не очищает буфер и не сообщает об ошибке само по себе.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Готовность и выбор",
+          "body_markdown": "select выбирает одну готовую communication branch; если готовы несколько, нельзя полагаться на приоритет порядка case. default превращает ожидание в неблокирующую проверку, но в бесконечном цикле может создать busy spin. Даже готовый ctx.Done не обязан победить одновременно готовую отправку, поэтому cancellation является кооперативной и допускает описанные протоколом остаточные действия. Для строгого запрета новых операций после stop нужно отдельное состояние/сериализация, а не только порядок branches.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "ownership",
+          "text": "Объясняю владение переданным payload.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "close",
+          "text": "Назначаю единственного владельца close.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "nil",
+          "text": "Отключаю исчерпанный вход nil channel.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "ready",
+          "text": "Не обещаю приоритет case в select.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "zero-ok",
+          "question": "Как отличить отправленный zero value от закрытия?",
+          "short_answer": "Проверить второе значение ok при receive.",
+          "detailed_answer": "Нулевое значение может быть обычными данными. ok=false означает закрытый и уже исчерпанный канал; буферные элементы читаются с ok=true.",
+          "pitfalls": "Не использовать value==0 как сигнал EOF.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Можно ли receiver закрыть channel?",
+              "expected_answer": "Только если протокол гарантирует отсутствие дальнейших sends; обычно receiver отменяет producer отдельным сигналом.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "nil-case",
+          "question": "Зачем присваивать входу nil в fan-in?",
+          "short_answer": "Чтобы отключить его case после завершения.",
+          "detailed_answer": "Закрытый channel всегда готов к receive и иначе может вызывать бесконечные zero values. Nil branch не готова, остальные inputs продолжают работать.",
+          "pitfalls": "Не закрывать nil channel: это panic.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "cancel-priority",
+          "question": "Получает ли ctx.Done приоритет в select?",
+          "short_answer": "Нет, порядок case приоритета не задаёт.",
+          "detailed_answer": "При нескольких готовых branches выбирается одна; операция может пройти одновременно с cancellation. Протокол должен допускать это либо сериализовать stop.",
+          "pitfalls": "Не обещать нулевое число sends после cancel только из select.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "pointer-copy",
+          "question": "Защищён ли slice после send по каналу?",
+          "short_answer": "Передаётся descriptor, массив остаётся общим.",
+          "detailed_answer": "Producer и consumer могут обратиться к одному backing array. Передайте ownership, скопируйте данные или защитите дальнейшие изменения.",
+          "pitfalls": "Не считать channel глубоким клонированием объектов.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Go specification: channel types",
+          "url": "https://go.dev/ref/spec#Channel_types",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Go specification: select",
+          "url": "https://go.dev/ref/spec#Select_statements",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Написать fan-in",
+          "description": "Объедините два inputs в output с cancellation. Отключайте закрытые inputs через nil, закройте output только после завершения всех sends.",
+          "expected_outcome": "Пустые и закрытые inputs не создают spin, ранняя отмена завершает все задачи.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "concurrency-context-cancellation",
+      "title": "Context, deadlines и cancellation",
+      "summary": "Передавать бюджет операции и освобождать связанные ресурсы по явной цепочке отмены.",
+      "difficulty": "intermediate",
+      "sort_order": 30,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "goroutines",
+        "go-errors-panic-recover"
+      ],
+      "sections": [
+        {
+          "heading": "Дерево операции",
+          "body_markdown": "Context переносит deadline, сигнал cancellation и request-scoped values между API. Передавайте его первым параметром и не подменяйте context запроса на Background внутри зависимого вызова. WithCancel и WithTimeout создают дочернее состояние; cancellation родителя распространяется к детям, но отмена ребёнка не отменяет родителя. Deadline ребёнка не продлевает более ранний deadline родителя. Context не является контейнером опций функции или необязательных бизнес-параметров.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Освобождение и реакция",
+          "body_markdown": "После создания дочернего context вызывайте cancel, обычно defer cancel(), даже если работа завершилась успешно: это освобождает связанные timers и references. Worker должен слушать Done при blocking operations и проверять Err на границе затратной работы. Cancellation не откатывает уже совершённый side effect и не убивает goroutine. Для внешнего запроса используйте NewRequestWithContext; для SQL — QueryContext/ExecContext. Операция драйвера может иметь собственные пределы кооперативной отмены.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Причина и бюджет",
+          "body_markdown": "Err различает Canceled и DeadlineExceeded, а context.Cause позволяет выразить более конкретную причину при соответствующем создании context. Не возвращайте клиенту внутреннюю cause без безопасного error mapping. Дайте downstream часть общего бюджета, оставив время на обработку ответа и cleanup; бессмысленно назначать retry полный timeout после исчерпания deadline запроса. Values используйте для tracing/identity с private key type, чтобы избежать столкновений. Семантика операции остаётся в явных аргументах.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "propagate",
+          "text": "Сохраняю родительскую цепочку context.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "cancel",
+          "text": "Вызываю cancel для созданных дочерних contexts.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "budget",
+          "text": "Учитываю общий deadline при retries.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "values",
+          "text": "Использую values для request metadata.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "child-deadline",
+          "question": "Можно ли продлить запрос дочерним WithTimeout?",
+          "short_answer": "Нет, более ранний parent deadline остаётся ограничением.",
+          "detailed_answer": "Context ребёнка отменяется вместе с родителем. Новый timeout может только сузить бюджет данной ветки, если он меньше остатка parent.",
+          "pitfalls": "Не подменять parent на Background ради обхода timeout.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Как отменить одну ветку fan-out, сохранив другую?",
+              "expected_answer": "Создать отдельный child context для ветки и отменить его; общий parent продолжает действовать.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "defer-cancel",
+          "question": "Зачем cancel после успешной работы?",
+          "short_answer": "Чтобы освободить связанные ресурсы и связи.",
+          "detailed_answer": "Дочерний context может удерживать timer и references до deadline. Немедленный cancel после окончания операции сокращает время их жизни.",
+          "pitfalls": "Не ждать timeout ради cleanup.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "side-effect",
+          "question": "Означает ли timeout, что запись не произошла?",
+          "short_answer": "Нет, результат side effect может быть неизвестен.",
+          "detailed_answer": "Внешний сервис мог применить изменение до потери ответа. Нужны идемпотентность и reconciliation; context не является transaction rollback.",
+          "pitfalls": "Не повторять оплату как заведомо неисполненную.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "value-key",
+          "question": "Почему string key в context.Value опасен?",
+          "short_answer": "Возможны столкновения между packages.",
+          "detailed_answer": "Неэкспортируемый собственный тип ключа даёт namespace. Чтение лучше скрыть за типизированной функцией; обязательный аргумент операции передавайте явно.",
+          "pitfalls": "Не превращать context в map произвольных параметров.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "context API",
+          "url": "https://pkg.go.dev/context",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Go blog: context",
+          "url": "https://go.dev/blog/context",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Передать deadline через два слоя",
+          "description": "Handler вызывает service и fake client с одним parent context. Дайте client более короткий бюджет, завершайте его через Done и отобразите безопасную ошибку.",
+          "expected_outcome": "Отмена родителя распространяется до client; короткая ветка не отменяет независимую работу parent.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "concurrency-locks-atomic",
+      "title": "Mutex, RWMutex и atomic",
+      "summary": "Защищать invariants и выбирать синхронизацию по контракту и contention.",
+      "difficulty": "intermediate",
+      "sort_order": 40,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "go-maps",
+        "go-types-zero-values"
+      ],
+      "sections": [
+        {
+          "heading": "Lock защищает invariant",
+          "body_markdown": "Mutex нужен не для отдельной переменной, а для согласованного состояния. Например, map balances и total должны изменяться под одной critical section, если обязаны соответствовать друг другу. Чтение тоже требует lock при конкурентной записи. Передавайте структуру с mutex по pointer и не копируйте lock после первого использования. Закрепите порядок нескольких locks, чтобы исключить циклическое ожидание. Вызовы пользовательских callbacks и медленный IO под lock увеличивают contention и риск reentrancy.",
+          "sort_order": 10
+        },
+        {
+          "heading": "RWMutex без обещаний ускорения",
+          "body_markdown": "RWMutex допускает несколько readers либо одного writer. Он полезен лишь при подходящем соотношении нагрузок и длине sections; для коротких чтений overhead может перекрыть выгоду. RLock не разрешает менять защищённые данные. Upgrade RLock в Lock без освобождения не поддерживается и может зависнуть; после release состояние нужно перепроверить. Не используйте recursive RLock как безопасный приём: ожидающий writer способен заблокировать новый reader и образовать deadlock внутри одной goroutine.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Atomic и snapshots",
+          "body_markdown": "sync/atomic предоставляет последовательносогласованные atomic operations, но не транзакции над несколькими полями. Counter удобно обновлять atomic.Int64.Add; read-modify-write через Load затем Store теряет concurrent increments. Для сложной конфигурации можно опубликовать immutable snapshot через atomic.Pointer и не менять его после публикации. CAS loops требуют корректного invariant и обработки повторной попытки; более простой mutex часто надёжнее. Отсутствие data race не гарантирует правильный бизнес-результат.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "invariant",
+          "text": "Формулирую состояние, защищённое одним lock.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "copy",
+          "text": "Не копирую использованный mutex.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "rw",
+          "text": "Измеряю пользу RWMutex.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "atomic",
+          "text": "Различаю атомарность поля и составной invariant.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "atomic-increment",
+          "question": "Почему Load()+Store() не заменяет Add()?",
+          "short_answer": "Между операциями возможен конкурентный update.",
+          "detailed_answer": "Два workers могут прочитать один старый counter и сохранить одинаковое новое значение. Add выполняет неделимый read-modify-write.",
+          "pitfalls": "Не считать последовательность atomic calls одной atomic operation.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Что делать, если под lock нужен IO?",
+              "expected_answer": "Скопировать необходимые данные, выполнить IO вне critical section и проверить состояние при применении результата; не нарушать invariant.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "upgrade",
+          "question": "Можно ли взять Lock, удерживая RLock?",
+          "short_answer": "Нет, это не поддерживаемый upgrade.",
+          "detailed_answer": "Writer ждёт завершения readers, включая текущего. Нужно release, затем Lock и повторная проверка условия, либо сразу exclusive lock.",
+          "pitfalls": "Не считать состояние неизменным между release и reacquire.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "rw-fast",
+          "question": "Почему RWMutex может быть медленнее Mutex?",
+          "short_answer": "У него дополнительный coordination overhead.",
+          "detailed_answer": "При коротких sections и частых writers readers мало выигрывают от параллелизма. Решение подтверждается benchmark с реалистичным contention.",
+          "pitfalls": "Не выбирать RWMutex только по факту наличия чтений.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "snapshot",
+          "question": "Что требуется от atomic.Pointer snapshot?",
+          "short_answer": "Опубликованный объект должен оставаться immutable.",
+          "detailed_answer": "Atomic pointer защищает переключение ссылки, но не дальнейшую мутацию полей объекта. Writer создаёт новую полную версию, reader работает с одним загруженным snapshot.",
+          "pitfalls": "Не менять map внутри уже опубликованной конфигурации.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "sync package",
+          "url": "https://pkg.go.dev/sync",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "sync/atomic package",
+          "url": "https://pkg.go.dev/sync/atomic",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Защитить составное состояние",
+          "description": "Реализуйте transfer между счетами и total invariant под одним lock. Добавьте concurrent checks, затем отдельный atomic counter метрик без попытки защитить им balances.",
+          "expected_outcome": "Тест -race проходит, баланс сохраняется и роль atomic ограничена независимой метрикой.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "concurrency-waitgroup-pool",
+      "title": "WaitGroup и ограниченный worker pool",
+      "summary": "Ожидать задачи без ошибок регистрации и ограничивать одновременно выполняемую работу.",
+      "difficulty": "intermediate",
+      "sort_order": 50,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "goroutines",
+        "concurrency-channels-select"
+      ],
+      "sections": [
+        {
+          "heading": "Регистрация до ожидания",
+          "body_markdown": "WaitGroup считает незавершённые задачи; это join primitive, а не средство передачи результата или cancellation. В классическом варианте wg.Add(1) выполняется до go, а defer wg.Done() — внутри task. Если Add поместить в запускаемую goroutine, Wait может увидеть ноль и завершиться раньше регистрации. Повторное использование допустимо после завершения предыдущего Wait, с новым независимым циклом задач. WaitGroup нельзя копировать после первого использования.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Go и ошибка задачи",
+          "body_markdown": "В актуальной стандартной библиотеке WaitGroup.Go объединяет регистрацию и запуск task; переданная функция не должна panic. Это удобство lifecycle, но ошибки и отмена остаются отдельным протоколом. Нельзя считать Go обработчиком panic или контейнером errors. Результаты передавайте через защищённое состояние или channel; учтите, что worker может блокироваться на отправке результата, пока coordinator уже ожидает Wait. Закрытие result channel выполняйте после завершения всех producers, а сбор результатов организуйте одновременно.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Размер pool и очередь",
+          "body_markdown": "Pool имеет фиксированное число workers и ограниченный jobs channel. Так задаётся предел активной работы и памяти очереди. Producer должен наблюдать context, чтобы enqueue не зависал после stop; worker также выбирает между job и Done. Размер подбирают по bottleneck: CPU, connections, downstream rate, а не по ожидаемому числу клиентов. Решите политику ошибки: продолжать остальные jobs или отменить группу. Для порядка выходов переносите sequence number, поскольку completion order отличается от input order.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "register",
+          "text": "Регистрирую task до начала Wait.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "errors",
+          "text": "Передаю errors отдельным каналом/состоянием.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "bounded",
+          "text": "Ограничиваю workers и размер очереди.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "results",
+          "text": "Собираю результаты без deadlock на Wait.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "add-inside",
+          "question": "Почему Add внутри go может сломать join?",
+          "short_answer": "Wait может увидеть нулевой counter раньше Add.",
+          "detailed_answer": "Scheduler не обязан запустить новую goroutine до вызова Wait. Регистрация должна предшествовать запуску или использовать WaitGroup.Go.",
+          "pitfalls": "Не исправлять это Sleep перед Wait.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Можно ли WaitGroup использовать повторно?",
+              "expected_answer": "Да, после полного завершения предыдущего Wait и с корректной регистрацией нового независимого набора задач.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "go-panic",
+          "question": "Обрабатывает ли WaitGroup.Go panic за вас?",
+          "short_answer": "Нет, task по контракту не должна panic.",
+          "detailed_answer": "Go упрощает счётчик lifecycle; ошибка должна возвращаться вашим протоколом. Recovery и политика fatal failure требуют отдельного дизайна.",
+          "pitfalls": "Не использовать Go как замену errgroup или recovery boundary.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "result-deadlock",
+          "question": "Почему Wait перед чтением results может зависнуть?",
+          "short_answer": "Workers ждут send, coordinator ждёт workers.",
+          "detailed_answer": "При заполненном или unbuffered results tasks не достигают Done. Читайте concurrently и закрывайте results отдельным join coordinator.",
+          "pitfalls": "Не рассчитывать на произвольный размер буфера для всех inputs.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "pool-size",
+          "question": "Как выбрать количество workers для API fan-out?",
+          "short_answer": "По бюджету downstream и latency измерениям.",
+          "detailed_answer": "Connections, квота запросов и память ограничивают число активных операций. Pool должен давать предсказуемый предел, а excess нагрузке нужна policy ожидания/отказа.",
+          "pitfalls": "Не создавать goroutine на каждый input без лимита.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "sync.WaitGroup",
+          "url": "https://pkg.go.dev/sync#WaitGroup",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Go memory model: synchronization",
+          "url": "https://go.dev/ref/mem",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Собрать bounded pool",
+          "description": "Обработайте 100 jobs четырьмя workers с очередью 8, result channel и cancellation. Отмените producer на заполненной очереди и дождитесь всех workers.",
+          "expected_outcome": "В любой момент активны не более четырёх jobs; cancel/join и сбор results не взаимоблокируются.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "concurrency-pipelines-backpressure",
+      "title": "Pipelines, backpressure и fan-out",
+      "summary": "Проектировать поток данных с ограниченной памятью и корректным ранним завершением.",
+      "difficulty": "intermediate",
+      "sort_order": 60,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "concurrency-channels-select",
+        "concurrency-context-cancellation"
+      ],
+      "sections": [
+        {
+          "heading": "Стадии и ownership",
+          "body_markdown": "Pipeline разделяет обработку на stages, которые читают вход, преобразуют данные и отправляют output. Каждая stage владеет закрытием своего output после завершения всех её sends; upstream input она обычно не закрывает. Fan-out распределяет работу между workers, fan-in объединяет outputs и закрывает общий выход после join producers. Параллельное выполнение меняет порядок результатов; если порядок важен, передавайте индексы и учитывайте память, необходимую для переупорядочивания.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Обратное давление",
+          "body_markdown": "Bounded channel заставляет producer ждать, когда downstream не успевает, и тем самым ограничивает количество queued данных. Это backpressure, но не полный memory budget: активные workers, большие payloads и скрытые buffers библиотек тоже удерживают память. Неограниченный slice очереди лишь маскирует перегрузку до OOM. Задайте capacity в связи с допустимой задержкой и объёмом сообщения; если ожидание неприемлемо, явно выбирайте drop, reject или spill с соответствующими гарантиями.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Ранний выход и ошибки",
+          "body_markdown": "Consumer может остановиться после первого результата или ошибки. Все upstream sends должны иметь ветку cancellation, иначе pipeline остаётся заблокированным. Ошибку публикуйте единым протоколом и завершайте оставшиеся stages, сохраняя исходную причину; закрытый output без error channel не объясняет failure. После cancel дождитесь stages, особенно перед закрытием общих ресурсов. Для нескольких источников определите, должен ли отказ одного остановить всех, или можно вернуть частичный результат с явным признаком неполноты.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "stages",
+          "text": "Назначаю владельца каждого output close.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "pressure",
+          "text": "Связываю buffer size с бюджетом данных.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "early",
+          "text": "Отменяю upstream при раннем выходе.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "partial",
+          "text": "Определяю contract partial results и ошибок.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "bounded-memory",
+          "question": "Гарантирует ли capacity 10 расход десять объектов?",
+          "short_answer": "Нет, есть активные tasks и дополнительные buffers.",
+          "detailed_answer": "Полный live set включает queues каждой stage, локальные значения workers и data за общими references. Budget нужно считать по всему pipeline.",
+          "pitfalls": "Не оценивать память только по одному channel.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Какой риск у reorder buffer?",
+              "expected_answer": "Head-of-line blocking: один медленный ранний элемент удерживает более поздние результаты и может исчерпать память.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "early-result",
+          "question": "Как вернуть первый результат без leaks?",
+          "short_answer": "Отменить общий context и join остальные stages.",
+          "detailed_answer": "Consumer прекращает чтение, поэтому upstream sends должны слушать Done. Join подтверждает release удержанных ресурсов.",
+          "pitfalls": "Не оставлять producers ждать ненужные results.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "order",
+          "question": "Сохраняет ли fan-out порядок входа?",
+          "short_answer": "Completion order обычно отличается.",
+          "detailed_answer": "Workers завершают с разной скоростью. Sequence number позволяет reorder, но медленный первый job может удержать много последующих results.",
+          "pitfalls": "Не объявлять order бесплатным при parallel processing.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "overflow",
+          "question": "Что делать, если downstream долго медленнее upstream?",
+          "short_answer": "Выбрать явную overload policy.",
+          "detailed_answer": "Bounded wait распространяет давление; deadline, reject или drop задают другие гарантии. Увеличение buffer откладывает проблему, но не повышает устойчивый throughput bottleneck.",
+          "pitfalls": "Не лечить постоянную перегрузку бесконечной очередью.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Go blog: pipelines",
+          "url": "https://go.dev/blog/pipelines",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "context package",
+          "url": "https://pkg.go.dev/context",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Сделать отменяемый pipeline",
+          "description": "Создайте генератор, parallel transform и consumer, который берёт только первые пять результатов. Ограничьте все queues и добавьте shared cancellation/join.",
+          "expected_outcome": "Ранний stop освобождает stages; бюджет памяти и поведение ordering описаны явно.",
+          "sort_order": 10
+        }
+      ]
+    }
+  ]
+}

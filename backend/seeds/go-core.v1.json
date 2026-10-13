@@ -1,0 +1,1209 @@
+{
+  "version": 1,
+  "category": {
+    "slug": "go-core",
+    "title": "Go Core",
+    "description": "Типы, коллекции, функции, методы, интерфейсы, ошибки, generics и организация Go-кода.",
+    "sort_order": 10
+  },
+  "topics": [
+    {
+      "slug": "go-types-zero-values",
+      "title": "Типы, zero values и указатели",
+      "summary": "Различать определённые типы и aliases, понимать нулевые значения, копирование и явные преобразования.",
+      "difficulty": "basic",
+      "sort_order": 10,
+      "estimated_minutes": 35,
+      "prerequisites": [],
+      "sections": [
+        {
+          "heading": "Значение и тип",
+          "body_markdown": "Тип определяет допустимые операции и правила присваивания. `type UserID int64` создаёт отдельный определённый тип: он помогает не перепутать идентификаторы разных сущностей. `type ID = int64` задаёт alias существующего типа и новой границы не создаёт. Числовые преобразования обычно явные; преобразование не является проверкой диапазона и может изменить значение. Для константы компилятор проверяет представимость в целевом типе. Размер `int` зависит от архитектуры, поэтому формат хранения и сетевой протокол лучше задавать явно.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Нулевое значение и готовность к работе",
+          "body_markdown": "Переменная без инициализатора получает zero value: числа — 0, bool — false, string — пустую строку; указатели, slices, maps, channels, функции и интерфейсы — nil. В struct и массиве правило применяется к каждому полю или элементу. Полезный zero value означает, что методы типа принимают такое состояние; это нужно проектировать, а не предполагать. Например, nil slice допускает append, но запись в nil map вызывает panic. `new(T)` возвращает указатель на нулевое T, а `make` инициализирует slice, map или channel.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Копирование и границы владения",
+          "body_markdown": "Аргументы функций передаются по значению. Переданный указатель тоже копируется, но обе копии могут указывать на один объект. Копирование struct не делает независимыми вложенные slices и maps. При ревью API выясняйте, кто может менять общие данные и где нужна отдельная копия. Разыменование nil-указателя — ошибка, а наличие указателя само по себе ничего не говорит о размещении объекта на heap: это отдельный вопрос escape analysis.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "defined-type",
+          "text": "Объясняю разницу между defined type и alias.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "zero-values",
+          "text": "Называю zero values основных типов и ограничения nil map.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "value-copy",
+          "text": "Показываю копирование аргумента и изменение объекта через указатель.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "conversion",
+          "text": "Различаю преобразование типа и проверку диапазона.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "alias-boundary",
+          "question": "Чем type UserID int64 отличается от type UserID = int64?",
+          "short_answer": "Первый создаёт отдельный тип, второй — alias.",
+          "detailed_answer": "Отдельный тип требует подходящего присваивания или явного преобразования и позволяет задать собственные методы. Alias сохраняет идентичность исходного типа и полезен, например, при переносе API.",
+          "pitfalls": "Не считать alias способом запретить смешивание идентификаторов.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Можно ли присвоить переменную int64 в UserID без преобразования?",
+              "expected_answer": "Для определённого UserID обычную типизированную переменную int64 нужно явно преобразовать; representable untyped constant — другой случай.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "nil-new-make",
+          "question": "Что получим после new(map[string]int)?",
+          "short_answer": "Указатель на nil map.",
+          "detailed_answer": "new выделяет нулевое значение типа и возвращает указатель. Для записи нужно отдельно инициализировать map через make или literal. make(map[string]int) сразу возвращает готовую map.",
+          "pitfalls": "Не путать указатель с инициализированным контейнером.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "copy-pointer",
+          "question": "Почему функция с аргументом *Config может изменить Config?",
+          "short_answer": "Копируется указатель, а не отдельный Config.",
+          "detailed_answer": "Копия указателя ссылается на тот же объект. Присваивание нового значения самому параметру не меняет указатель вызывающей стороны, но запись через него меняет общий объект.",
+          "pitfalls": "Не утверждать, что Go передаёт аргументы по ссылке.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "int-width",
+          "question": "Почему int не всегда подходит для поля протокола?",
+          "short_answer": "Его размер зависит от архитектуры.",
+          "detailed_answer": "Для формата с фиксированной шириной выбирают int32, int64 или беззнаковый аналог, проверяют диапазон до преобразования и явно задают кодирование. int удобен для индексов внутри процесса.",
+          "pitfalls": "Не считать преобразование int64 в int32 защитой от переполнения.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Go specification: Types",
+          "url": "https://go.dev/ref/spec#Types",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Effective Go: Allocation",
+          "url": "https://go.dev/doc/effective_go#allocation_new",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Спроектировать типы заказа",
+          "description": "Создайте UserID и OrderID как отдельные типы, Config с полезным zero value и функцию изменения Config через указатель. Напишите тесты на исходное состояние и на копирование struct с вложенным slice.",
+          "expected_outcome": "Объяснены места совместного владения, а смешивание типизированных ID требует явного преобразования.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "go-arrays-slices",
+      "title": "Массивы, slices и append",
+      "summary": "Разобрать длину, ёмкость, общий backing array и последствия append для владения данными.",
+      "difficulty": "intermediate",
+      "sort_order": 20,
+      "estimated_minutes": 35,
+      "prerequisites": [
+        "go-types-zero-values"
+      ],
+      "sections": [
+        {
+          "heading": "Массив и представление slice",
+          "body_markdown": "Длина массива входит в тип: [3]int и [4]int — разные типы. При присваивании массива копируются элементы. Slice описывает участок backing array и содержит длину и ёмкость; копирование slice копирует этот дескриптор, а не элементы. Длина ограничивает индексирование, ёмкость — возможное расширение. Операция s[a:b] обычно создаёт ещё один вид на ту же память. Не называйте slice самостоятельным динамическим массивом без объяснения этой связи.",
+          "sort_order": 10
+        },
+        {
+          "heading": "append и общий массив",
+          "body_markdown": "append возвращает новый slice, поэтому результат нужно использовать. Если ёмкости хватает, элементы добавляются в существующий backing array; иначе выделяется другой массив и данные копируются. Вторая ссылка на прежний массив может увидеть запись при append без выделения памяти. Точная стратегия роста ёмкости не является контрактом языка. Полное slice expression s[:len(s):len(s)] ограничивает ёмкость вида: последующий append непустого набора элементов будет вынужден получить другой массив, но изменение существующих элементов всё ещё общее.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Независимая копия и удержание памяти",
+          "body_markdown": "Если вызывающая сторона должна владеть данными независимо, создайте новый slice и скопируйте элементы. Это shallow copy: указатели, slices и maps внутри элементов могут остаться общими. Маленький subslice большого буфера может удерживать весь backing array живым; отдельная копия полезной части решает именно эту проблему. nil slice и непустой или пустой инициализированный slice могут различаться в сериализации и в проверке на nil, хотя len у nil и пустого равен нулю.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "array-value",
+          "text": "Объясняю, почему длина массива входит в тип.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "shared-array",
+          "text": "Рисую общий backing array у двух slices.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "append-result",
+          "text": "Использую результат append и учитываю доступную capacity.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "copy-boundary",
+          "text": "Выбираю между shallow copy и независимым владением вложенными данными.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "append-alias",
+          "question": "Когда append через один slice меняет данные другого?",
+          "short_answer": "Когда slices разделяют backing array и append использует его свободную ёмкость.",
+          "detailed_answer": "Запись нового элемента происходит в том же массиве. Если другой slice включает эту позицию в свою длину, он видит запись. При перевыделении новый slice указывает на другой массив.",
+          "pitfalls": "Не обещать отсутствие изменений только потому, что append вызван на копии slice.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Гарантирует ли s[:len(s):len(s)] независимость всех изменений?",
+              "expected_answer": "Нет. Этот вид ограничивает capacity для append, но существующие элементы по-прежнему разделяются.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "len-cap",
+          "question": "Чем len отличается от cap?",
+          "short_answer": "len задаёт число доступных элементов, cap — предел расширения вида.",
+          "detailed_answer": "Индексирование требует индекс меньше len. Пересечение через slice expression может расширить длину до доступной capacity. make([]int, 3, 8) даёт три доступных элемента и запас для роста.",
+          "pitfalls": "Не индексировать элемент только на основании cap.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "subslice-retention",
+          "question": "Почему маленький subslice может удерживать большой буфер?",
+          "short_answer": "Он продолжает ссылаться на тот же backing array.",
+          "detailed_answer": "GC сохраняет достижимую память. Скопируйте нужную часть в новый небольшой slice, когда большой буфер больше не должен быть общим. Перед оптимизацией измерьте удержание памяти и частоту операции.",
+          "pitfalls": "Не считать уменьшение len освобождением массива.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "shallow-clone",
+          "question": "Достаточно ли copy для независимого []map[string]int?",
+          "short_answer": "Нет: элементы map всё ещё разделяются.",
+          "detailed_answer": "copy копирует значения элементов, то есть ссылки на те же maps. Для глубокого независимого владения нужно отдельно копировать каждую map и решить, что делать с вложенными значениями.",
+          "pitfalls": "Не использовать термин deep copy для обычного copy.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Go Slices: usage and internals",
+          "url": "https://go.dev/blog/slices-intro",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Go specification: Slice expressions",
+          "url": "https://go.dev/ref/spec#Slice_expressions",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Поймать aliasing при append",
+          "description": "Создайте два вида одного массива с запасом capacity. Покажите изменение через append, затем повторите с ограниченной capacity и с отдельной копией. Напишите проверки результата каждого варианта.",
+          "expected_outcome": "Тесты фиксируют наблюдаемые изменения без предположений о точной стратегии роста capacity.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "go-maps",
+      "title": "Maps: ключи, nil и порядок обхода",
+      "summary": "Учитывать comparable keys, comma-ok, общую map и отсутствие гарантированного порядка обхода.",
+      "difficulty": "intermediate",
+      "sort_order": 30,
+      "estimated_minutes": 35,
+      "prerequisites": [
+        "go-types-zero-values"
+      ],
+      "sections": [
+        {
+          "heading": "Ключи и отсутствие элемента",
+          "body_markdown": "Ключ map должен поддерживать сравнение. Срезы, maps и функции ключами быть не могут. Для интерфейсного ключа динамическое значение тоже должно быть сравнимым, иначе операция может вызвать panic. Чтение отсутствующего ключа возвращает zero value типа значения; форма value, ok := m[key] отличает отсутствие от записанного zero value. delete отсутствующего ключа безопасен. Размер map — число ключей, а не её резерв памяти.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Nil и общие изменения",
+          "body_markdown": "Чтение, len, range и delete допустимы для nil map, но запись требует инициализации. Передача map функции копирует значение map, сохраняя общие данные, поэтому запись по ключу видна вызывающей стороне. Присваивание параметру другой map не заменяет map в переменной вызывающей стороны. Значение m[key] не addressable; у struct-значения в map нельзя напрямую присвоить поле через m[key].Field: получите копию, измените и запишите обратно либо используйте указатели с явным владением.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Обход и синхронизация",
+          "body_markdown": "Порядок range по map не определён и может различаться между обходами. Для отчёта, ручного построения JSON или теста с последовательным выводом соберите и отсортируйте ключи; не проверяйте конкретный порядок случайного обхода. Стандартный encoding/json.Marshal сам сортирует поддерживаемые ключи map при кодировании объекта; внешняя сортировка для него не нужна. Параллельное чтение допустимо при отсутствии изменений. Одновременное чтение и запись или несколько записей требуют внешней синхронизации либо другого дизайна владения. Встроенная диагностика concurrent map operations не заменяет race detector и не делает map потокобезопасной.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "comma-ok",
+          "text": "Различаю отсутствующий ключ и сохранённый zero value.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "nil-map",
+          "text": "Показываю разрешённые операции над nil map.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "comparable-keys",
+          "text": "Проверяю допустимость статического и динамического типа ключа.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "determinism",
+          "text": "Сортирую ключи для детерминированного результата.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "missing-zero",
+          "question": "Как отличить отсутствующий счётчик от значения 0?",
+          "short_answer": "Использовать value, ok := m[key].",
+          "detailed_answer": "Одиночное чтение возвращает 0 в обоих случаях. Флаг ok сообщает о наличии ключа и позволяет корректно реализовать отрицательное кэширование или различие между неизвестным и нулевым значением.",
+          "pitfalls": "Не делать вывод о наличии ключа по value != 0.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Что вернёт comma-ok для nil map?",
+              "expected_answer": "Zero value и false; чтение безопасно.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "nil-write",
+          "question": "Почему запись в nil map вызывает panic?",
+          "short_answer": "Для неё ещё не создано хранилище.",
+          "detailed_answer": "Инициализируйте map через make или literal до записи. Если map передана параметром, присваивание параметру make не обновит переменную вызывающего кода; верните новую map или измените API.",
+          "pitfalls": "Не ожидать автоматической инициализации при первой записи.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "map-order",
+          "question": "Как получить стабильный порядок обхода?",
+          "short_answer": "Собрать и отсортировать ключи.",
+          "detailed_answer": "Контракт языка не гарантирует порядок range. После сортировки читайте значения в порядке ключей; при конкурентных изменениях дополнительно обеспечьте согласованный снимок данных.",
+          "pitfalls": "Не полагаться на порядок одного успешного запуска теста.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "map-value-field",
+          "question": "Почему нельзя написать users[id].Name = \"Ada\" для map[int]User?",
+          "short_answer": "Элемент map не addressable.",
+          "detailed_answer": "Прочитайте User в локальную переменную, измените Name и присвойте User обратно. При map[int]*User можно менять объект через указатель, но появляется отдельная задача синхронизации его полей.",
+          "pitfalls": "Не считать хранение указателей автоматическим решением конкурентного доступа.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Go maps in action",
+          "url": "https://go.dev/blog/maps",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Go specification: Map types",
+          "url": "https://go.dev/ref/spec#Map_types",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        },
+        {
+          "title": "encoding/json.Marshal",
+          "url": "https://pkg.go.dev/encoding/json#Marshal",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 30
+        }
+      ],
+      "practice": [
+        {
+          "title": "Стабильный отчёт счётчиков",
+          "description": "Реализуйте функцию, возвращающую отсортированные пары ключ/значение. Проверьте nil map, пустую map, отсутствующий ключ и записанный ноль.",
+          "expected_outcome": "Результат не зависит от порядка range; отсутствие и нулевое значение различаются там, где этого требует контракт.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "go-strings",
+      "title": "Строки, bytes, runes и UTF-8",
+      "summary": "Отличать байтовую длину от числа Unicode code points и не разрезать UTF-8 по случайной границе.",
+      "difficulty": "basic",
+      "sort_order": 40,
+      "estimated_minutes": 35,
+      "prerequisites": [
+        "go-types-zero-values",
+        "go-arrays-slices"
+      ],
+      "sections": [
+        {
+          "heading": "Строка хранит байты",
+          "body_markdown": "string — неизменяемая последовательность байтов. Строка не обязана содержать корректный UTF-8: в неё можно поместить произвольные bytes. len(s) возвращает число байтов, а s[i] — byte, а не символ. byte — alias uint8; rune — alias int32 и обычно представляет Unicode code point. Неизменяемость означает отсутствие присваивания отдельному байту строки, но переменной string можно присвоить другую строку.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Обход Unicode",
+          "body_markdown": "range по string декодирует UTF-8 и возвращает байтовый индекс начала code point и rune. Для некорректного UTF-8 возвращается replacement rune; это не проверка корректности входных данных. []rune удобно для операций по code points, но преобразование создаёт представление, отличное от байтов. Один воспринимаемый пользователем символ может включать несколько code points: букву и комбинируемый знак или emoji-последовательность. Число runes не является универсальной длиной для пользовательского интерфейса.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Выбор операции",
+          "body_markdown": "Для бинарного протокола считайте bytes. Для формата, требующего UTF-8, сначала проверьте корректность, затем обходите по code points или используйте подходящую Unicode-библиотеку для grapheme clusters. s[:n] режет по байтам и может создать некорректный UTF-8. При накоплении текста избегайте неограниченного числа конкатенаций в цикле; strings.Builder подходит для последовательного построения строки, но копировать уже использованный Builder нельзя. Выбор оптимизации подтверждайте benchmark, а не догадкой о числе allocations.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "byte-length",
+          "text": "Объясняю результат len для русской строки.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "range-offset",
+          "text": "Знаю, что индекс range по string — байтовый offset.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "unicode-boundary",
+          "text": "Различаю byte, code point и пользовательский символ.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "utf8-validity",
+          "text": "Проверяю UTF-8 там, где этого требует формат входа.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "len-russian",
+          "question": "Почему len(\"Я\") равно 2?",
+          "short_answer": "Этот code point занимает два байта в UTF-8.",
+          "detailed_answer": "len считает bytes. Число Unicode code points можно посчитать utf8.RuneCountInString, а число визуальных символов требует отдельного определения и не всегда совпадает с числом runes.",
+          "pitfalls": "Не объявлять len количеством букв.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Что возвращает индекс в range по \"Яa\"?",
+              "expected_answer": "Для первой rune — 0, для второй — 2: это начала code points в байтах.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "invalid-string",
+          "question": "Может ли string содержать некорректный UTF-8?",
+          "short_answer": "Да, string хранит произвольные байты.",
+          "detailed_answer": "Неизменяемость string не гарантирует кодировку. Если API обещает UTF-8, используйте utf8.ValidString и определите, отклонять ли неверные данные или заменять их.",
+          "pitfalls": "Не считать успешное преобразование []byte в string валидацией.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "slice-string",
+          "question": "Когда s[:n] повреждает UTF-8?",
+          "short_answer": "Когда n попадает внутрь многобайтового code point.",
+          "detailed_answer": "Slice expression работает с байтовыми границами. Для обрезки текста сначала найдите подходящую границу UTF-8 и отдельно решите, допустимо ли разделять grapheme cluster.",
+          "pitfalls": "Не заменять byte-индекс на число runes без изменения алгоритма.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "rune-character",
+          "question": "Почему []rune не решает все задачи длины текста?",
+          "short_answer": "Визуальный символ может состоять из нескольких code points.",
+          "detailed_answer": "Комбинируемые знаки и emoji-последовательности нарушают соответствие одна rune — один пользовательский символ. Уточните требования: лимит bytes, code points или grapheme clusters.",
+          "pitfalls": "Не обещать корректную пользовательскую обрезку только через []rune.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Strings, bytes, runes and characters in Go",
+          "url": "https://go.dev/blog/strings",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Go specification: String types",
+          "url": "https://go.dev/ref/spec#String_types",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Безопасно ограничить текст",
+          "description": "Напишите обрезку строки до N code points и тесты для ASCII, кириллицы, пустой строки и некорректного UTF-8. Явно опишите политику для некорректной кодировки и отличие от grapheme clusters.",
+          "expected_outcome": "Нет разрезанных UTF-8 последовательностей; единица измерения длины является частью контракта.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "go-functions-defer",
+      "title": "Функции, closures, variadic и defer",
+      "summary": "Понимать копирование параметров, захваченные переменные, variadic slices и порядок отложенных вызовов.",
+      "difficulty": "intermediate",
+      "sort_order": 50,
+      "estimated_minutes": 35,
+      "prerequisites": [
+        "go-types-zero-values",
+        "go-arrays-slices"
+      ],
+      "sections": [
+        {
+          "heading": "Функции и значения параметров",
+          "body_markdown": "Функция может быть значением, параметром или результатом другой функции. Параметры копируются; возвращаемые значения позволяют явно передать результат и ошибку. Variadic-параметр ...T внутри функции имеет тип []T. Передача существующего slice через s... не создаёт независимую копию backing array, поэтому функция может изменить его элементы. Контракт API должен сообщать, допускаются ли такие изменения.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Closures и время жизни",
+          "body_markdown": "Closure захватывает переменные окружающей области, а не обещает неизменяемый снимок их значений. Поведение зависит от области объявления. Для переменных цикла, объявленных самим range с :=, при версии языка Go 1.22+ каждая итерация получает отдельные переменные. Обычно версию языка выбирает директива go в go.mod: новая версия компилятора сама по себе не меняет семантику старого модуля. Если range присваивает ранее объявленным переменным через =, они продолжают переиспользоваться. Это различие важно при запуске горутин и отложенных closures; правило не следует переносить на любые переменные за пределами цикла.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Отложенный вызов",
+          "body_markdown": "Когда выполняется defer, функция и аргументы вызова вычисляются сразу, а сам вызов исполняется при выходе из окружающей функции. Вызовы идут в обратном порядке. Closure может прочитать переменную позднее, поэтому defer print(x) и defer func(){print(x)}() способны дать разные результаты. defer применяется к функции, а не к ближайшему блоку: множество defer в длинном цикле откладывает освобождение всех ресурсов до выхода из функции. Выделите обработку одного элемента в отдельную функцию, если ресурс должен закрываться на каждой итерации. Ошибку Close тоже нужно учитывать по контракту.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "variadic-sharing",
+          "text": "Объясняю совместное владение при передаче s... .",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "closure-scope",
+          "text": "Различаю переменную, захваченную closure, и копию значения.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "defer-evaluation",
+          "text": "Называю момент вычисления аргументов defer.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "defer-loop",
+          "text": "Не откладываю массовое освобождение ресурсов до конца длинного цикла.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "defer-arguments",
+          "question": "Когда вычисляются аргументы отложенного вызова?",
+          "short_answer": "При выполнении оператора defer.",
+          "detailed_answer": "Выполняется отложенно сам вызов. Для closure её обычные аргументы также вычисляются сразу, но чтение захваченных переменных в теле происходит позже. Это объясняет разные результаты при изменении переменной перед return.",
+          "pitfalls": "Не считать, что всё выражение defer вычисляется только на выходе.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "В каком порядке выполнятся три defer?",
+              "expected_answer": "В обратном порядке регистрации: последний зарегистрированный вызов выполняется первым.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "defer-in-loop",
+          "question": "Почему defer file.Close() в большом цикле может исчерпать файловые дескрипторы?",
+          "short_answer": "Все вызовы Close ждут выхода из окружающей функции.",
+          "detailed_answer": "Цикл не создаёт новую функцию. Поместите обработку файла в отдельную функцию или закрывайте его в конце итерации с обработкой ошибки.",
+          "pitfalls": "Не утверждать, что defer выполняется при выходе из блока for.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "range-closures",
+          "question": "Нужно ли всегда копировать range-переменную для closure?",
+          "short_answer": "Нет; учитывайте версию языка и способ объявления.",
+          "detailed_answer": "При версии языка Go 1.22+ (обычно go 1.22 или новее в go.mod) переменные, объявленные самим range через :=, отдельные для каждой итерации. Присваивание внешней переменной через = продолжает менять одну переменную. Другие общие данные closure всё равно могут содержать race.",
+          "pitfalls": "Не повторять устаревшее правило без условий.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "variadic-copy",
+          "question": "Может ли func f(xs ...int) изменить элементы исходного slice при f(s...)?",
+          "short_answer": "Да, underlying array разделяется.",
+          "detailed_answer": "Внутри функции xs является slice. Изменение xs[i] видно через s. Присваивание нового slice параметру не заменяет дескриптор s, а append зависит от доступной ёмкости.",
+          "pitfalls": "Не считать variadic автоматической deep copy.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Go specification: Defer statements",
+          "url": "https://go.dev/ref/spec#Defer_statements",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Fixing For Loops in Go 1.22",
+          "url": "https://go.dev/blog/loopvar-preview",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Проверить момент захвата",
+          "description": "Напишите тесты для defer с обычным аргументом и closure, для variadic с s... и для range с := и =. Отдельно вынесите обработку одного файла из цикла в функцию.",
+          "expected_outcome": "Ожидаемые результаты объяснены через область переменной и момент вычисления, а ресурсы не накапливаются до конца цикла.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "go-methods-embedding",
+      "title": "Методы, receivers и embedding",
+      "summary": "Различать method sets T и *T, понимать promotion и выбирать receiver по семантике владения.",
+      "difficulty": "intermediate",
+      "sort_order": 60,
+      "estimated_minutes": 35,
+      "prerequisites": [
+        "go-types-zero-values",
+        "go-functions-defer"
+      ],
+      "sections": [
+        {
+          "heading": "Receiver и изменение значения",
+          "body_markdown": "Метод с receiver T получает копию значения T, а метод с receiver *T — копию указателя на объект. Pointer receiver нужен для изменения самого объекта, может уменьшать копирование больших struct и делает выбор методов согласованным. Value receiver не гарантирует неизменяемость вложенных maps и slices. Значения с mutex нельзя копировать после начала использования; для таких типов обычно выбирают указатели и проверяют обращения через go vet.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Method sets и удобство вызова",
+          "body_markdown": "Method set T содержит методы с receiver T; method set *T содержит методы с receiver T и *T. Это влияет на удовлетворение интерфейсам. Для addressable значения v компилятор может позволить v.PointerMethod() как удобную форму вызова, но из этого не следует, что T удовлетворяет интерфейсу с этим методом. Элемент map не addressable. Проверять реализацию интерфейса полезно явным compile-time assertion, а причину несовпадения объяснять через method set, не через доступность одного вызова.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Embedding как композиция",
+          "body_markdown": "Встроенное поле позволяет обращаться к promoted fields и methods через внешний тип при однозначном выборе имени. Это композиция: внутренний объект остаётся отдельным полем, а внешний тип не становится подтипом встроенного. Promotion меняет доступный API и может случайно выставить наружу методы реализации. При неоднозначности селектора квалифицируйте обращение через нужное поле. Методы встроенного объекта работают с его receiver; override в смысле классического наследования здесь нет.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "receiver-choice",
+          "text": "Выбираю receiver по изменению состояния и стоимости копирования.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "method-set",
+          "text": "Различаю method sets T и *T.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "addressability",
+          "text": "Не путаю удобство вызова с реализацией интерфейса.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "embedding-api",
+          "text": "Учитываю promotion методов и случайное расширение публичного API.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "pointer-interface",
+          "question": "Почему *Counter реализует интерфейс, а Counter может не реализовать?",
+          "short_answer": "Метод с pointer receiver входит в method set *Counter, но не Counter.",
+          "detailed_answer": "Возможность вызвать pointer method на addressable Counter — отдельное правило сокращённой формы вызова. Присваивание интерфейсу проверяет method set самого типа.",
+          "pitfalls": "Не переносить автоматическое взятие адреса из вызова метода на присваивание интерфейсу.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Можно ли так вызвать pointer method на элементе map[int]Counter?",
+              "expected_answer": "Элемент map не addressable. Получите значение в переменную или храните *Counter, осознанно выбрав владение.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "value-receiver-map",
+          "question": "Может ли value receiver изменить map-поле struct?",
+          "short_answer": "Да, если map разделяет те же данные.",
+          "detailed_answer": "Копируется struct, включая значение map. Запись по ключу изменяет общую map. Заменить map-поле в исходном struct таким receiver нельзя: это изменение поля копии.",
+          "pitfalls": "Не называть value receiver гарантией отсутствия побочных эффектов.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "embedding-inheritance",
+          "question": "Является ли embedding наследованием?",
+          "short_answer": "Нет, это композиция с promotion селекторов.",
+          "detailed_answer": "Встроенное поле остаётся частью значения. Методы вызываются на соответствующем receiver, а удовлетворение интерфейсам определяется итоговыми method sets. Нельзя рассчитывать на виртуальный override как в классической иерархии классов.",
+          "pitfalls": "Не обещать полиморфизм наследования только из-за embedding.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "embedded-collision",
+          "question": "Что делать при неоднозначном promoted method?",
+          "short_answer": "Обращаться через конкретное встроенное поле или задать метод внешнего типа.",
+          "detailed_answer": "Несколько методов с тем же именем на одинаковой глубине делают сокращённый селектор неоднозначным. Явная квалификация показывает выбор и делает API понятнее.",
+          "pitfalls": "Не рассчитывать на порядок объявления полей для разрешения неоднозначности.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Go specification: Method sets",
+          "url": "https://go.dev/ref/spec#Method_sets",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Effective Go: Embedding",
+          "url": "https://go.dev/doc/effective_go#embedding",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Проверить границы method set",
+          "description": "Создайте Counter с pointer receiver, интерфейс Inc() и внешний тип со встроенным Counter. Добавьте compile-time assertions для допустимых вариантов; разберите недопустимые отдельно от исполняемых тестов.",
+          "expected_outcome": "Реализация интерфейса объясняется method set, а promotion не принимается за наследование.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "interfaces",
+      "title": "Интерфейсы в Go",
+      "summary": "Неявная реализация, nil-интерфейсы и небольшие контракты у потребителя.",
+      "difficulty": "intermediate",
+      "sort_order": 70,
+      "estimated_minutes": 35,
+      "prerequisites": [
+        "go-methods-embedding"
+      ],
+      "sections": [
+        {
+          "heading": "Контракт через method set",
+          "body_markdown": "Обычный интерфейс описывает требуемые методы. Тип реализует его неявно, если имеет подходящий method set: отдельного implements нет. Интерфейс полезен на границе, где действительно нужны разные реализации, например хранилище сервиса или io.Reader. Объявляйте небольшой контракт по потребностям вызывающего кода. Не создавайте интерфейс для каждого struct только ради единообразия: это увеличивает связанность с искусственными абстракциями.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Статический интерфейс и динамическое значение",
+          "body_markdown": "Значение интерфейса несёт динамический тип и значение. Оно равно nil только при отсутствии обоих. Если в error положен nil-указатель типа *MyError, интерфейс уже содержит динамический тип и может быть не nil. Возвращайте настоящий nil явно в ветке без ошибки. Метод nil-указателя может быть вызван, но обязан корректно обработать receiver, если контракт допускает такое состояние; разыменование внутри метода иначе приведёт к panic.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Проверка типа и сравнение",
+          "body_markdown": "Type assertion x.(T) проверяет динамический тип или реализацию интерфейса; форма value, ok безопасно обрабатывает несовпадение. Без ok несовпадение вызывает panic. Type switch полезен для ограниченного набора вариантов, но не должен заменять нормальный полиморфный контракт по всей системе. Сравнение интерфейсов может вызвать panic, если они содержат значения одинакового несравнимого динамического типа, например slices. Constraint-интерфейсы с type terms служат для generics и не всегда могут использоваться как тип обычной переменной.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "implicit-implementation",
+          "text": "Проверяю реализацию интерфейса по method set.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "typed-nil",
+          "text": "Объясняю typed nil и возвращаю настоящий nil при отсутствии ошибки.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "small-contract",
+          "text": "Проектирую небольшой интерфейс у потребителя.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "assertion-ok",
+          "text": "Использую comma-ok для ожидаемого несовпадения динамического типа.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "typed-nil-error",
+          "question": "Почему error с nil-указателем внутри не равен nil?",
+          "short_answer": "Он всё ещё содержит динамический тип.",
+          "detailed_answer": "Присваивание *MyError(nil) в error создаёт интерфейс со значением nil и типом *MyError. Для отсутствия ошибки верните nil в явной ветке. Это частый источник ложного сообщения об ошибке и panic в Error().",
+          "pitfalls": "Не проверять только указатель до неявной упаковки.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Исправляет ли сравнение err == nil проверку nil-указателя внутри?",
+              "expected_answer": "Нет. Нужно исправить возвращаемое значение; при необходимости конкретный тип можно проверить через assertion, но это не универсальный контракт error.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "consumer-interface",
+          "question": "Где обычно объявлять интерфейс зависимости сервиса?",
+          "short_answer": "У потребителя, по реально используемым операциям.",
+          "detailed_answer": "Так реализация не навязывает всем клиентам свой полный API. Несколько методов упрощают альтернативные реализации и тестовые doubles, но интерфейс нужен только при наличии полезной границы.",
+          "pitfalls": "Не порождать зеркальный интерфейс на десятки методов ради мокирования.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "assertion-panic",
+          "question": "Чем отличаются x.(T) и value, ok := x.(T)?",
+          "short_answer": "Первая форма вызывает panic при несовпадении, вторая сообщает false.",
+          "detailed_answer": "Используйте ok, если несовпадение ожидаемо по контракту. Для type switch перечислите допустимые варианты и обработайте неизвестный тип. Успешная assertion не означает независимое копирование вложенных данных.",
+          "pitfalls": "Не использовать panic как обычную ветку проверки входа.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "interface-comparison",
+          "question": "Всегда ли два интерфейсных значения можно безопасно сравнить?",
+          "short_answer": "Нет, одинаковый несравнимый динамический тип может вызвать panic.",
+          "detailed_answer": "Например, два interface{} со значениями []int нельзя сравнить через ==. Ограничьте контракт сравнимыми значениями или выберите сравнение, соответствующее предметной области.",
+          "pitfalls": "Не считать слово interface гарантией универсального сравнения.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Go specification: Interface types",
+          "url": "https://go.dev/ref/spec#Interface_types",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Go FAQ: nil error values",
+          "url": "https://go.dev/doc/faq#nil_error",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Воспроизвести typed nil",
+          "description": "Создайте собственный тип ошибки с pointer receiver. Напишите один тест для ошибочного возврата nil-указателя как error и другой для исправленной ветки с return nil. Выделите двухметодный интерфейс зависимости у потребителя.",
+          "expected_outcome": "Тест показывает ненулевой error в ошибочном варианте и настоящий nil в исправленном; контракт не копирует лишние методы реализации.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "go-errors-panic-recover",
+      "title": "Errors, wrapping, panic и recover",
+      "summary": "Сохранять причины ошибок через wrapping, проверять цепочку и отличать ожидаемый отказ от нарушения инварианта.",
+      "difficulty": "intermediate",
+      "sort_order": 80,
+      "estimated_minutes": 35,
+      "prerequisites": [
+        "interfaces",
+        "go-functions-defer"
+      ],
+      "sections": [
+        {
+          "heading": "Ошибка как часть результата",
+          "body_markdown": "error — интерфейс с Error() string. Возвращайте ошибку для ожидаемых отказов: отсутствующего ресурса, неверного входа, недоступной зависимости. Добавляйте контекст операции, полезный вызывающему коду, но не включайте пароли и полные приватные payloads. Sentinel error задаёт известную категорию, а собственный тип ошибки может переносить структурированные сведения. Не заставляйте клиент разбирать текст Error() как машинный протокол.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Wrapping и контракт причины",
+          "body_markdown": "fmt.Errorf с %w сохраняет доступ к исходной ошибке; %v формирует текст без обычной связи unwrap с вложенной ошибкой. errors.Is проверяет совпадение по дереву ошибок, включая поддерживаемую кастомную логику Is; errors.As ищет ошибку подходящего типа и заполняет переданный указатель. errors.Join объединяет несколько ошибок. Публичное сохранение внутренней ошибки становится частью контракта: клиент может начать зависеть от её типа или sentinel. Не раскрывайте внутренний драйвер автоматически, если это закрепит нежелательную связанность.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Panic и граница восстановления",
+          "body_markdown": "panic запускает разматывание стека текущей горутины с выполнением defer. recover может остановить panic только при прямом вызове из отложенной функции в этой же горутине. Он не ловит panic соседней горутины и не служит общим механизмом обработки отказов процесса. Восстановление на границе запроса допустимо, если состояние остаётся согласованным и ошибка наблюдаема; продолжать работу с нарушенным инвариантом опасно. Не превращайте любой panic в тихий nil-результат и не подменяйте им обычную validation.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "error-contract",
+          "text": "Различаю sentinel, собственный тип и текст ошибки.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "wrap-cause",
+          "text": "Сохраняю причину через %w там, где она входит в контракт.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "is-as",
+          "text": "Выбираю errors.Is или errors.As по виду проверки.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "recover-boundary",
+          "text": "Ограничиваю recover прямым defer и той же горутиной.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "wrap-format",
+          "question": "Чем %w отличается от %v при fmt.Errorf?",
+          "short_answer": "%w позволяет обнаружить вложенную ошибку через стандартный обход.",
+          "detailed_answer": "С %v сохраняется строковое представление, но не обычная unwrap-связь с этим аргументом. Wrapping выбирают сознательно: он даёт полезную классификацию, но может раскрыть внутреннюю зависимость.",
+          "pitfalls": "Не проверять причины по подстрокам Error().",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Сработает ли err == sentinel после wrapping?",
+              "expected_answer": "Обычно нет: внешняя ошибка отличается. Для контрактной проверки используйте errors.Is.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "as-target",
+          "question": "Для чего нужен errors.As?",
+          "short_answer": "Найти ошибку определённого типа в дереве ошибок.",
+          "detailed_answer": "Передайте подходящий ненулевой указатель на переменную целевого типа и обработайте false. Так можно получить структурированные поля, не разбирая строку и не теряя вложенную ошибку из-за внешнего контекста.",
+          "pitfalls": "Не передавать произвольный неуказательный target.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "recover-goroutine",
+          "question": "Может ли recover в HTTP-handler поймать panic запущенной им горутины?",
+          "short_answer": "Нет, это другой стек выполнения.",
+          "detailed_answer": "У каждой горутины своя граница восстановления. Если запуск необходим, определите её lifecycle, передачу ошибки и политику panic внутри самой горутины; завершение handler не освобождает от этого контракта.",
+          "pitfalls": "Не считать recover глобальной защитой процесса.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "panic-validation",
+          "question": "Почему panic плохо подходит для проверки пользовательского входа?",
+          "short_answer": "Ожидаемый отказ должен возвращаться как контролируемая ошибка.",
+          "detailed_answer": "Паника усложняет normal flow, может обходить контракт ошибок и оставлять частично изменённое состояние. Validation должна вернуть понятный результат до мутации; panic оставьте для условий, где продолжение действительно нарушает инвариант.",
+          "pitfalls": "Не скрывать нарушение инварианта blanket recover без наблюдаемости.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Working with Errors in Go 1.13",
+          "url": "https://go.dev/blog/go1.13-errors",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Defer, Panic, and Recover",
+          "url": "https://go.dev/blog/defer-panic-and-recover",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        },
+        {
+          "title": "Package errors",
+          "url": "https://pkg.go.dev/errors",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 30
+        }
+      ],
+      "practice": [
+        {
+          "title": "Сохранить и классифицировать причину",
+          "description": "Реализуйте функцию загрузки настройки с sentinel для отсутствия, собственной ошибкой неверного значения и контекстом через %w. Проверьте errors.Is и errors.As. Отдельный тест покажет прямой recover в defer.",
+          "expected_outcome": "Клиент классифицирует ошибки без анализа текста; восстановление не выдаётся за защиту соседних горутин.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "go-generics",
+      "title": "Generics, constraints и type sets",
+      "summary": "Использовать параметры типов для повторяемых алгоритмов и не путать constraint с интерфейсом поведения.",
+      "difficulty": "intermediate",
+      "sort_order": 90,
+      "estimated_minutes": 35,
+      "prerequisites": [
+        "interfaces",
+        "go-arrays-slices"
+      ],
+      "sections": [
+        {
+          "heading": "Когда нужен параметр типа",
+          "body_markdown": "Generics позволяют выразить один алгоритм для нескольких типов с проверкой на этапе компиляции. Функция получает параметры типов в квадратных скобках; constraint задаёт допустимые аргументы типов и доступные операции. Это полезно для контейнеров, преобразования slices и алгоритмов без необходимости стирать тип до any. Если вариативность заключается в поведении объекта, небольшой обычный интерфейс часто проще и выразительнее. Не добавляйте параметр типа только ради более сложной сигнатуры.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Type sets и underlying types",
+          "body_markdown": "Constraint-интерфейс может ограничить множество типов термами, их объединением и требуемыми методами. ~int допускает типы с underlying type int, а int без ~ означает именно этот тип в таком терме. Для T доступны только операции, допустимые для всех типов в его type set. comparable нужен, например, для ключей map, однако при интерфейсных значениях всё ещё нужно учитывать возможность несравнимого динамического значения. Non-basic interface с type terms используется как constraint, а не как обычный runtime-контейнер значений.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Inference и ограничения дизайна",
+          "body_markdown": "Компилятор часто выводит аргументы типов из аргументов функции и constraints, но не все случаи разрешимы; явные аргументы делают нужный выбор. У методов нельзя отдельно объявить собственный список параметров типов: метод generic-типа использует параметры receiver, а независимый generic-алгоритм можно сделать функцией. Не обещайте автоматическое ускорение или отсутствие allocations после перехода на generics. Читаемость, размер API и runtime-поведение оцениваются отдельно; benchmark нужен для утверждений о производительности.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "generic-purpose",
+          "text": "Обосновываю generics повторяемым алгоритмом, а интерфейс — поведением.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "type-set",
+          "text": "Объясняю int, ~int и объединение термов.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "operations",
+          "text": "Использую только операции, разрешённые constraint.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "inference",
+          "text": "Различаю вывод аргументов типов и явную инстанциацию.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "tilde-term",
+          "question": "Что означает ~int в constraint?",
+          "short_answer": "Допускаются типы с underlying type int.",
+          "detailed_answer": "Определённый type Count int удовлетворяет такому терму, но не терму int без ~. Это позволяет применять алгоритм к доменным числовым типам без потери их идентичности.",
+          "pitfalls": "Не считать ~ оператором runtime-преобразования.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Разрешает ли any сложение двух значений T?",
+              "expected_answer": "Нет. Операция должна быть допустима для всех типов constraint; any включает типы, для которых + не определён.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "generics-interface",
+          "question": "Когда выбрать generics вместо обычного интерфейса?",
+          "short_answer": "Когда меняется тип данных алгоритма, а не только поведение реализации.",
+          "detailed_answer": "Например, MapSlice сохраняет статические типы входа и выхода. Для объекта, предоставляющего Read или Save, интерфейс задаёт нужные операции независимо от хранения. Оба механизма можно сочетать при реальной необходимости.",
+          "pitfalls": "Не объявлять один подход универсальной заменой другого.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "generic-method",
+          "question": "Можно ли объявить func (c Cache) Get[T any](key string) T?",
+          "short_answer": "Метод не может вводить собственный список параметров типов.",
+          "detailed_answer": "Параметризуйте сам Cache, если его тип хранения фиксирован, либо используйте generic-функцию для независимого алгоритма. Решение должно соответствовать lifecycle и владению, а не обходить ограничение через any.",
+          "pitfalls": "Не переносить синтаксис generic-функции на метод.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "generic-speed",
+          "question": "Гарантирует ли generics ускорение относительно interface{}?",
+          "short_answer": "Нет, это нужно измерять.",
+          "detailed_answer": "Generics прежде всего выражают статический контракт и повторное использование алгоритма. Конкретные расходы зависят от компилятора, операций и представления данных; используйте репрезентативные benchmark и профили.",
+          "pitfalls": "Не продавать generics как автоматическую оптимизацию.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Getting started with generics",
+          "url": "https://go.dev/doc/tutorial/generics",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Go specification: Type parameter declarations",
+          "url": "https://go.dev/ref/spec#Type_parameter_declarations",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Реализовать типизированный MapSlice",
+          "description": "Напишите функцию MapSlice[A, B any] с преобразованием каждого элемента, сохранением порядка и явной политикой для nil input. Дополнительно создайте сумму для набора типов с underlying int64.",
+          "expected_outcome": "Тесты покрывают nil, пустой и непустой input; определённый доменный тип поддерживается через ~int64.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "go-packages-modules",
+      "title": "Packages, modules и управление зависимостями",
+      "summary": "Разделять package и module, понимать export, internal, go.mod, go.sum и воспроизводимый граф зависимостей.",
+      "difficulty": "intermediate",
+      "sort_order": 100,
+      "estimated_minutes": 35,
+      "prerequisites": [
+        "go-functions-defer",
+        "interfaces"
+      ],
+      "sections": [
+        {
+          "heading": "Package как единица API",
+          "body_markdown": "Package объединяет исходные файлы в единицу компиляции и задаёт пространство имён. Экспорт определяется начальной заглавной буквой идентификатора; доступ к реализации ограничивается неэкспортируемыми именами и правилами internal directories. В обычном каталоге исходные файлы относятся к одному package, с отдельным случаем внешнего test-package с суффиксом _test. Циклический импорт packages запрещён: выделяйте контракт или устраняйте неверную зависимость, а не маскируйте цикл глобальными переменными.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Module и граф версий",
+          "body_markdown": "Module — набор packages с общим module path и go.mod; один repository может содержать несколько modules. require задаёт зависимости, а граф определяет выбранные версии по правилам module resolution. Для большинства зависимостей используется minimal version selection: выбирается максимальная из требуемых для данного module path версий в графе, а не автоматически самая новая версия на сервере. Для major v2+ module path обычно включает /v2 и далее. go.sum хранит проверочные суммы скачанного содержимого, а не полноценный lockfile выбранных версий.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Изменение зависимости и воспроизводимость",
+          "body_markdown": "Обновляйте зависимости сознательно, проверяйте diff go.mod/go.sum и запускайте тесты. go mod tidy согласует manifests с используемыми импортами, но сам по себе не является тестом совместимости. replace может перенаправлять зависимость на локальный каталог или другую версию; локальный путь ломает чистый checkout, если не обеспечен окружением. Директива go задаёт требования и семантику версии языка, а toolchain участвует в выборе инструментария. Не рассчитывайте на скрытые зависимости рабочего компьютера: воспроизводимость проверяйте в чистом окружении.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "package-module",
+          "text": "Различаю package, module и repository.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "export-internal",
+          "text": "Объясняю export и ограничения internal.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "dependency-graph",
+          "text": "Понимаю require и выбор версии в графе.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "sum-reproducibility",
+          "text": "Не называю go.sum полноценным lockfile и проверяю чистую сборку.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "package-vs-module",
+          "question": "Чем module отличается от package?",
+          "short_answer": "Module содержит packages и описывает общий путь и зависимости.",
+          "detailed_answer": "Package является единицей исходного API и компиляции. Module определяется go.mod и версионируется как набор packages. Repository — организационная единица VCS и не обязан совпадать с module.",
+          "pitfalls": "Не считать import path всегда URL корня repository.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Почему package в internal нельзя импортировать из произвольного проекта?",
+              "expected_answer": "Правило internal ограничивает импорт кодом в дереве родительского каталога соответствующего internal.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "sum-lock",
+          "question": "Почему go.sum нельзя считать обычным lockfile?",
+          "short_answer": "Он фиксирует контрольные суммы содержимого, а не единственный набор выбранных версий.",
+          "detailed_answer": "Выбранные версии определяются go.mod и графом зависимостей. В go.sum могут оставаться суммы нескольких версий и отдельных go.mod; это поддерживает проверку целостности, но не заменяет управление графом.",
+          "pitfalls": "Не редактировать go.sum вручную как список активных зависимостей.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "mvs-version",
+          "question": "Выбирает ли MVS последнюю доступную версию библиотеки?",
+          "short_answer": "Нет, выбор основан на версиях, требуемых графом.",
+          "detailed_answer": "Для module path выбирается максимальная из требуемых версий. Новая опубликованная версия сама по себе не обновляет проект; изменение зависимости должно быть явным и проверенным.",
+          "pitfalls": "Не путать maximal requirement в графе с latest release.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "replace-checkout",
+          "question": "Чем опасен replace на локальный путь?",
+          "short_answer": "Чистому окружению может быть недоступен этот каталог.",
+          "detailed_answer": "Замена удобна для локальной совместной разработки, но должна быть явной частью workflow. Перед поставкой проверьте checkout без соседних директорий и локальных workspace overrides.",
+          "pitfalls": "Не считать успешную сборку на своём компьютере доказательством воспроизводимости.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Go Modules Reference",
+          "url": "https://go.dev/ref/mod",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Managing dependencies",
+          "url": "https://go.dev/doc/modules/managing-dependencies",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Собрать module в чистом окружении",
+          "description": "Создайте module с двумя packages и небольшой внешней зависимостью. Выполните tidy, сравните manifests, проверьте тесты и сборку без локального replace. Разберите намеренный цикл импорта и устраните неверную границу.",
+          "expected_outcome": "Пути и manifests достаточны для воспроизводимой сборки; причина запрета import cycle объяснена.",
+          "sort_order": 10
+        }
+      ]
+    }
+  ]
+}

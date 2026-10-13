@@ -1,0 +1,719 @@
+{
+  "version": 1,
+  "category": {
+    "slug": "system-design",
+    "title": "System Design",
+    "description": "Согласованность, масштабирование и поведение распределённых систем при отказах.",
+    "sort_order": 120
+  },
+  "topics": [
+    {
+      "slug": "design-caching",
+      "title": "Caching: freshness, invalidation и stampede",
+      "summary": "Выбирать ключи и допустимую устарелость, сохранять изоляцию пользователей и ограничивать нагрузку на miss.",
+      "difficulty": "intermediate",
+      "sort_order": 10,
+      "estimated_minutes": 45,
+      "prerequisites": [
+        "go-maps"
+      ],
+      "sections": [
+        {
+          "heading": "Контракт кэширования",
+          "body_markdown": "Кэш хранит производное представление, а не автоматически становится источником истины. Перед выбором реализации определяют, можно ли читать устаревшие данные, насколько долго и для каких операций. Cache-aside сначала читает кэш, затем источник и сохраняет результат; обновление источника требует согласованной invalidation policy. Ключ включает все факторы ответа: субъект, параметры и версию формата, если они влияют на результат. Общий ключ для приватной заметки может раскрыть данные другому пользователю.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Freshness и HTTP",
+          "body_markdown": "TTL ограничивает время хранения, но не устраняет гонку: читатель может загрузить старое значение до записи, затем положить его после invalidation. Решения включают versioned keys, проверку версии и более строгую координацию, когда свежесть критична. HTTP Cache-Control управляет повторным использованием response: no-cache требует revalidation, а no-store запрещает хранение. ETag позволяет валидировать представление без полной передачи; policy private отделяет пользовательский cache от shared cache.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Miss и отказ",
+          "body_markdown": "Одновременное истечение популярных ключей вызывает stampede — всплеск одинаковых запросов к источнику. Jitter TTL и объединение конкурентных загрузок уменьшают пик, но требуют ограничения времени ожидания и memory budget. При отказе кэша fallback в БД может перегрузить её: заранее ограничивают concurrency, допускают stale только по контракту и наблюдают hit ratio вместе с source latency. Высокий hit ratio не доказывает ни правильность данных, ни хорошую latency всех запросов.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Задаю допустимую stale window и источник истины.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Учитываю субъект и параметры в cache key.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Различаю no-cache и no-store.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Ограничиваю stampede и fallback нагрузку.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Можно ли кэшировать GET /notes/42 только по URL?",
+          "short_answer": "Только если ответ не зависит от пользователя.",
+          "detailed_answer": "Для приватного ресурса ключ и authorization должны учитывать subject. Shared response cache без корректной policy может вернуть ранее прочитанную чужую заметку.",
+          "pitfalls": "Путать одинаковый URL с одинаковыми полномочиями.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Достаточно ли добавить user_id в ключ?",
+              "expected_answer": "Это предотвращает часть смешения, но не заменяет проверку актуальных прав, expiry и безопасную HTTP cache policy.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Что означает Cache-Control: no-cache?",
+          "short_answer": "Хранить можно, использовать без проверки нельзя.",
+          "detailed_answer": "Перед reuse нужна успешная revalidation по правилам HTTP. Для запрета хранения применяют no-store; это различие важно для приватных данных.",
+          "pitfalls": "Переводить no-cache как полное отключение storage.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "После UPDATE удалили ключ, но старое значение вернулось. Как?",
+          "short_answer": "Конкурентный reader мог заполнить cache позже.",
+          "detailed_answer": "Reader прочитал старую запись до commit, writer удалил ключ, reader положил старый результат. Проверка версии либо иной порядок координации предотвращает конкретную гонку.",
+          "pitfalls": "Считать delete после write доказательством строгой согласованности.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Кэш отключился. Почему fallback может обрушить БД?",
+          "short_answer": "Весь поток miss идёт в источник.",
+          "detailed_answer": "Система могла быть рассчитана на малую долю miss. Нужны ограничение concurrency, load shedding и допустимый stale response; capacity источника проверяют заранее.",
+          "pitfalls": "Считать cache необязательным без оценки failure load.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "RFC 9111 — HTTP Caching",
+          "url": "https://datatracker.ietf.org/doc/html/rfc9111",
+          "source_name": "IETF",
+          "resource_type": "documentation",
+          "sort_order": 10
+        },
+        {
+          "title": "Handling Overload",
+          "url": "https://sre.google/sre-book/handling-overload/",
+          "source_name": "Google SRE",
+          "resource_type": "documentation",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Смоделировать cache race",
+          "description": "На in-memory cache с искусственными задержками воспроизведите read-before-write и fill-after-delete. Добавьте version policy и объединение загрузок популярного ключа.",
+          "expected_outcome": "Старая версия не вытесняет новую, число source calls ограничено под burst.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "design-queues-delivery",
+      "title": "Очереди, acknowledgements и повторная доставка",
+      "summary": "Разделять publisher confirm и consumer ack, проектировать idempotent обработку и bounded retries.",
+      "difficulty": "intermediate",
+      "sort_order": 20,
+      "estimated_minutes": 45,
+      "prerequisites": [
+        "go-errors-panic-recover"
+      ],
+      "sections": [
+        {
+          "heading": "Зачем отделять выполнение",
+          "body_markdown": "Очередь позволяет принять работу и выполнить позже, сгладить burst и масштабировать consumers. Это меняет пользовательский контракт: accepted не равен completed, нужна возможность видеть статус и ошибку. Broker не устраняет ограничение пропускной способности: если arrival rate устойчиво выше обработки, backlog растёт. Контролируют не только длину очереди, но и возраст старейшей задачи, время обработки и допустимый предел задержки. Для малого синхронного сервиса очередь может добавить больше расходов, чем пользы.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Подтверждение и атомарность",
+          "body_markdown": "Publisher confirm подтверждает принятие broker по его условиям, consumer ack сообщает о завершении доставки со стороны consumer; они независимы. Ack до фиксации результата рискует потерять работу, ack после commit допускает duplicate при crash между commit и ack. Idempotency key и уникальное ограничение помогают связать проверку дубликата с бизнес-изменением в одной транзакции. Для разрыва между DB commit и publish используют outbox либо другой явно обоснованный протокол.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Повторы и poison messages",
+          "body_markdown": "Retry должен иметь предел попыток, backoff и классификацию ошибки: недоступная зависимость может восстановиться, некорректный payload сам не исправится. Dead-letter механизм позволяет отделить сообщения, требующие разбора, но не гарантирует успешную обработку или вечное хранение. Prefetch ограничивает число unacked deliveries у consumer; чрезмерное значение усиливает memory pressure и несправедливость. При shutdown прекращают новые доставки и завершают либо возвращают незавершённые по контракту broker.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Различаю accepted, published и completed.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Объясняю независимость confirm и ack.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Связываю deduplication с бизнес-транзакцией.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Ограничиваю retry, prefetch и backlog age.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Consumer сделал commit и упал до ack. Что произойдёт?",
+          "short_answer": "Сообщение может прийти повторно.",
+          "detailed_answer": "Broker не получил подтверждение и может requeue delivery. Обработка по стабильному idempotency key должна вернуть прежний результат или безопасно пропустить уже применённую транзакцию.",
+          "pitfalls": "Обещать exactly-once только по наличию manual ack.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Где хранить dedup marker?",
+              "expected_answer": "В той же транзакции, что и бизнес-изменение, с уникальным ключом; отдельный предварительный marker создаёт окно потери работы.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Publisher confirm означает, что письмо уже отправлено?",
+          "short_answer": "Нет, consumer ещё мог не выполнить задачу.",
+          "detailed_answer": "Confirm относится к приёму сообщения broker, а отправка письма — отдельный side effect. Для пользователя нужен статус задачи и способ обработки повторного external effect.",
+          "pitfalls": "Смешивать broker persistence с бизнес-результатом.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "DB commit прошёл, publish не прошёл. Как сохранить событие?",
+          "short_answer": "Записать outbox вместе с бизнес-изменением.",
+          "detailed_answer": "Фоновый relay повторяет публикацию сохранённого события; consumer учитывает duplicates. Нужны cleanup и наблюдаемость задержки outbox, а не обещание общей транзакции двух систем.",
+          "pitfalls": "Считать два последовательных вызова атомарными.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Одно сообщение бесконечно requeue. Что изменить?",
+          "short_answer": "Ограничить попытки и отделить permanent failure.",
+          "detailed_answer": "Сохраняют причины, отправляют в контролируемый dead-letter flow и разбирают payload. Бесконечный немедленный retry расходует worker capacity и мешает исправным задачам.",
+          "pitfalls": "Добавлять consumers вместо устранения poison loop.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Acknowledgements and Publisher Confirms",
+          "url": "https://www.rabbitmq.com/docs/confirms",
+          "source_name": "RabbitMQ",
+          "resource_type": "documentation",
+          "sort_order": 10
+        },
+        {
+          "title": "Dead Letter Exchanges",
+          "url": "https://www.rabbitmq.com/docs/dlx",
+          "source_name": "RabbitMQ",
+          "resource_type": "documentation",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Crash между commit и ack",
+          "description": "Смоделируйте доставку одного job дважды и failure после фиксации результата. Используйте уникальный job_id и транзакционный marker; добавьте permanent error путь.",
+          "expected_outcome": "Бизнес-эффект не дублируется, ошибочное сообщение не занимает worker бесконечно.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "design-load-balancing",
+      "title": "Балансировка, stateless API и capacity",
+      "summary": "Выбирать распределение запросов с учётом соединений, готовности реплик и ограничений общих зависимостей.",
+      "difficulty": "intermediate",
+      "sort_order": 30,
+      "estimated_minutes": 45,
+      "prerequisites": [
+        "go-types-zero-values"
+      ],
+      "sections": [
+        {
+          "heading": "Как распределяется работа",
+          "body_markdown": "Балансировщик выбирает backend по алгоритму: round-robin, наименьшее число активных запросов или соединений, hash и другие варианты. L4 обычно опирается на транспортные соединения, L7 видит HTTP и может маршрутизировать запросы. При keep-alive одно соединение переносит много запросов, поэтому равномерность connections не гарантирует равномерность work. Длительность и стоимость отдельных requests могут отличаться на порядки: полезно наблюдать нагрузку реплик, а не только их число.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Состояние и readiness",
+          "body_markdown": "Stateless API не означает отсутствие состояния во всей системе: sessions и данные могут храниться в общей БД. Локальная map сессий привязывает пользователя к реплике; sticky sessions частично скрывают проблему, но failover теряет доступ. Readiness исключает draining или неготовый backend из маршрутизации. Health check не гарантирует успех каждого запроса: состояние меняется после проверки. Нужны bounded timeouts и явная policy retries с учётом возможных side effects.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Предел масштабирования",
+          "body_markdown": "Добавление API replicas помогает лишь до bottleneck в БД, сети или внешнем сервисе. Connection pool каждой реплики умножается на их число: десять pools по двадцать connections создают до двухсот соединений. Горизонтальное масштабирование требует общего budget зависимости и ограничений concurrency. При выведении backend из rotation дают завершиться активным requests. Одновременный retry всех клиентов после outage может перегрузить оставшиеся экземпляры даже при хорошем алгоритме распределения.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Различаю L4 connection и L7 request routing.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Сохраняю сессии независимо от API replica.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Учитываю readiness, drain и границы retries.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Считаю общий pool budget при scaling.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Round-robin дал одинаковое число запросов, но одна реплика перегружена. Почему?",
+          "short_answer": "Запросы имеют разную стоимость или длительность.",
+          "detailed_answer": "Число requests не равно работе. Изучают concurrency, latency, долгие операции и affinity; подходящий алгоритм уменьшает skew, но не устраняет общий bottleneck.",
+          "pitfalls": "Оценивать fairness только по request count.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Почему L4 балансировка может сохранять skew?",
+              "expected_answer": "Долгоживущие соединения остаются на выбранном backend и переносят неодинаковый поток запросов.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Session хранится в локальной map. Что случится после добавления реплики?",
+          "short_answer": "Часть запросов потеряет авторизованную сессию.",
+          "detailed_answer": "Новая реплика не имеет записи. Shared session store или иной проверяемый протокол устраняет зависимость от local memory; stickiness не даёт полноценного failover.",
+          "pitfalls": "Объявлять API stateless только потому, что нет файлов.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "После scale-out БД стала хуже. Что проверить первым?",
+          "short_answer": "Общий размер pools и нагрузку запросов.",
+          "detailed_answer": "Replica count увеличивает одновременные DB calls и connections. Планируют суммарный budget, уменьшают per-instance pool и измеряют очереди и время запросов.",
+          "pitfalls": "Считать каждую replica независимой от общей БД.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Можно ли балансировщику повторять POST после timeout?",
+          "short_answer": "Только с учётом idempotency и результата первой попытки.",
+          "detailed_answer": "Timeout не доказывает отсутствие commit. Retry может удвоить side effect; используют стабильный ключ и серверный протокол дедупликации либо отказываются от автоматического повтора.",
+          "pitfalls": "Считать transport failure отменой бизнес-действия.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Load Balancing at the Frontend",
+          "url": "https://sre.google/sre-book/load-balancing-frontend/",
+          "source_name": "Google SRE",
+          "resource_type": "documentation",
+          "sort_order": 10
+        },
+        {
+          "title": "Load Balancing in the Datacenter",
+          "url": "https://sre.google/sre-book/load-balancing-datacenter/",
+          "source_name": "Google SRE",
+          "resource_type": "documentation",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Сравнить routing под смешанной нагрузкой",
+          "description": "Смоделируйте три API replicas с короткими и длинными запросами, сравните round-robin и least-active. Рассчитайте общий лимит DB connections до и после scaling.",
+          "expected_outcome": "Skew измерен по активной работе, pool budget не превышает ёмкость зависимости.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "design-replication-consistency",
+      "title": "Репликация, read-your-writes и failover",
+      "summary": "Понимать lag, уровни подтверждения commit и риск split-brain при переключении primary.",
+      "difficulty": "intermediate",
+      "sort_order": 40,
+      "estimated_minutes": 45,
+      "prerequisites": [
+        "go-errors-panic-recover"
+      ],
+      "sections": [
+        {
+          "heading": "Копии и задержка",
+          "body_markdown": "Репликация переносит изменения источника на другие экземпляры для доступности и масштабирования чтения. PostgreSQL physical replication передаёт WAL; standby воспроизводит журнал с возможным отставанием. Async commit на primary не означает, что replica уже видит запись или что она сохранится при потере primary. Реплика не является backup: ошибочное удаление или порча логических данных может быстро распространиться, поэтому нужны независимые точки восстановления.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Согласованность чтения",
+          "body_markdown": "После успешного update чтение со standby может вернуть старое значение. Для read-your-writes можно направить чувствительный путь на primary, дождаться воспроизведения нужной позиции или использовать иной подходящий протокол. Synchronous replication повышает гарантии только согласно настроенному quorum и уровню подтверждения: remote flush и remote apply дают разные свойства. Цена — ожидание сети и доступности участников. Нужно назвать, какие операции обязаны видеть последний commit, а каким допустим lag.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Переключение и неопределённость",
+          "body_markdown": "Failover требует выбора новой primary и исключения записей в старую, иначе split-brain создаёт расходящиеся histories. Fencing — способ лишить прежний узел возможности выполнять записи, а не просто поменять DNS. RPO описывает допустимую потерю данных, RTO — время восстановления; выбранный протокол должен соответствовать им. Если клиент потерял ответ commit, итог операции неизвестен: повтор оценивают по idempotency и сверке состояния, а не по предположению, что timeout равен rollback.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Объясняю WAL lag и ограничение async durability.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Задаю read-your-writes для конкретного пути.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Различаю remote flush и remote apply.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Обосновываю fencing, RPO и RTO.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Обновление заметки прошло, следующий GET видит старый текст. Почему?",
+          "short_answer": "GET мог попасть на отстающую replica.",
+          "detailed_answer": "Асинхронное воспроизведение ещё не дошло до commit. Для чувствительного чтения выбирают primary или ждут достаточную WAL position по явному протоколу.",
+          "pitfalls": "Объявлять transaction isolation на primary причиной любой stale read.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Всегда ли synchronous commit делает standby read свежим?",
+              "expected_answer": "Нет, зависит от уровня подтверждения: запись WAL на disk отличается от применения; remote_apply имеет более сильное условие.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Достаточно ли standby для защиты от ошибочного DELETE?",
+          "short_answer": "Нет, DELETE тоже реплицируется.",
+          "detailed_answer": "Backup и point-in-time recovery сохраняют возможность вернуться до ошибки. Standby помогает при отказе узла и чтении, но не обеспечивает независимую историю сам по себе.",
+          "pitfalls": "Называть replica резервной копией без recovery policy.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Старый primary потерял связь, выбрали новый. Почему нужен fencing?",
+          "short_answer": "Старый может продолжать принимать записи.",
+          "detailed_answer": "Сетевой partition не гарантирует остановку узла. Нужен механизм, который лишит его права записи до разрешения нового writer, иначе данные расходятся.",
+          "pitfalls": "Приравнивать смену адреса маршрутизации к запрету старых writes.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Клиент получил timeout при COMMIT. Можно сразу повторить создание заказа?",
+          "short_answer": "Итог неизвестен, повтор требует idempotency.",
+          "detailed_answer": "Commit мог завершиться до потери ответа. Проверяют стабильный operation key или состояние; если клиент создаёт новый ID при retry, возможен второй заказ.",
+          "pitfalls": "Считать любую ошибку соединения доказательством rollback.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Log-Shipping Standby Servers",
+          "url": "https://www.postgresql.org/docs/current/warm-standby.html",
+          "source_name": "PostgreSQL",
+          "resource_type": "documentation",
+          "sort_order": 10
+        },
+        {
+          "title": "Replication settings",
+          "url": "https://www.postgresql.org/docs/current/runtime-config-replication.html",
+          "source_name": "PostgreSQL",
+          "resource_type": "documentation",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Спроектировать read routing",
+          "description": "Для создания заказа, каталога и истории операций определите допустимый lag и маршрут чтения. Разберите потерю primary после commit с async и remote_apply режимами.",
+          "expected_outcome": "Гарантии названы по операциям, RPO/RTO и неизвестный исход commit учтены.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "design-partitioning-sharding",
+      "title": "Partitioning, sharding и hot keys",
+      "summary": "Выбирать ключ разделения данных и объяснять стоимость cross-shard операций и перераспределения.",
+      "difficulty": "intermediate",
+      "sort_order": 50,
+      "estimated_minutes": 45,
+      "prerequisites": [
+        "go-maps"
+      ],
+      "sections": [
+        {
+          "heading": "Два разных уровня разделения",
+          "body_markdown": "Table partitioning делит логическую таблицу на части внутри DB механизма и может упростить pruning, архивирование и обслуживание. Sharding распределяет части данных между независимыми узлами или базами и добавляет маршрутизацию. Само наличие PostgreSQL partitions не означает горизонтального распределения по серверам. Решение начинают с объёма, запросов и bottleneck: иногда индекс, retention или более мощный primary решают задачу проще, чем новая распределённая схема.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Ключ и распределение",
+          "body_markdown": "Range partitioning удобен для времени и удаления старых диапазонов, но свежий диапазон может получать большинство writes. Hash распределяет ключи ровнее, однако один горячий tenant или объект всё равно концентрирует нагрузку. Tenant-based shard упрощает локальные операции пользователя, но крупные tenants могут выбиваться из среднего. Оценивают размер, request rate и рост отдельных ключей; равномерное число строк не гарантирует равномерные CPU, I/O или сетевой трафик.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Цена границ",
+          "body_markdown": "Cross-shard joins, global uniqueness и транзакции становятся сложнее: нужно выбрать локальность данных, отдельный coordination protocol или изменить контракт. Resharding включает перенос, отслеживание новых writes, cutover маршрутизации и проверку полноты; копирование snapshots само по себе недостаточно. Изменение количества shards не должно хаотично менять адрес всех ключей. Routing version, явное отображение или consistent hashing помогают, но каждый вариант требует наблюдаемости и процедуры восстановления.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Различаю partition table и независимые shards.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Выбираю ключ по запросам и распределению нагрузки.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Объясняю hot tenant и range hotspot.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Учитываю cross-shard constraints и live resharding.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "PostgreSQL таблица разделена по месяцам. Она автоматически масштабируется на четыре сервера?",
+          "short_answer": "Нет, partitions сами по себе остаются в DB системе.",
+          "detailed_answer": "Локальное partitioning помогает pruning и lifecycle данных. Для независимых серверов нужен отдельный routing и data placement protocol с другой операционной сложностью.",
+          "pitfalls": "Считать любое partitioning sharding.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Когда monthly partitions полезны без sharding?",
+              "expected_answer": "Для временных filters, pruning и дешёвого удаления старых данных, если query pattern и размеры это оправдывают.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Hash по tenant_id равномерный, но один shard перегружен. Почему?",
+          "short_answer": "Один tenant может давать большую часть работы.",
+          "detailed_answer": "Равномерность ключей не означает равномерность веса. Измеряют tenant traffic и объём, выделяют крупных tenants или меняют гранулярность с учётом локальных транзакций.",
+          "pitfalls": "Увеличивать число shards, сохраняя тот же неделимый hot key.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Как обеспечить unique email across shards?",
+          "short_answer": "Нужна отдельная глобальная координация либо иной контракт.",
+          "detailed_answer": "Локальный unique index знает только свой shard. Используют единый registry, детерминированное размещение по email или другой протокол, оценивая availability и race conditions.",
+          "pitfalls": "Обещать глобальную уникальность суммой локальных indexes.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Почему для resharding мало скопировать таблицы и сменить router?",
+          "short_answer": "Во время копирования продолжаются изменения.",
+          "detailed_answer": "Нужно обработать concurrent writes, проверить completeness, согласовать cutover и предотвратить чтение разных версий. План включает rollback и версию маршрутизации.",
+          "pitfalls": "Считать snapshot актуальным в момент переключения.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Table Partitioning",
+          "url": "https://www.postgresql.org/docs/current/ddl-partitioning.html",
+          "source_name": "PostgreSQL",
+          "resource_type": "documentation",
+          "sort_order": 10
+        },
+        {
+          "title": "Handling Overload",
+          "url": "https://sre.google/sre-book/handling-overload/",
+          "source_name": "Google SRE",
+          "resource_type": "documentation",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Оценить ключ shard для заказов",
+          "description": "Сравните tenant_id, order_id hash и диапазон created_at для истории пользователя, global search и горячего tenant. Составьте пошаговый cutover при продолжающихся writes.",
+          "expected_outcome": "Выбран ключ с явной ценой cross-shard queries и обнаружением hotspots.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "design-failure-modes",
+      "title": "Failure modes, перегрузка и ограниченная деградация",
+      "summary": "Проектировать timeout budgets, retries, backpressure и поведение при потере связи между компонентами.",
+      "difficulty": "intermediate",
+      "sort_order": 60,
+      "estimated_minutes": 45,
+      "prerequisites": [
+        "go-errors-panic-recover"
+      ],
+      "sections": [
+        {
+          "heading": "Нормальный путь и отказ",
+          "body_markdown": "System design должен описывать не только успешный запрос, но и slow dependency, partial failure, network partition и исчерпание ресурсов. При partition сильная согласованность может потребовать отказа в части операций, а принятие writes на обеих сторонах требует правил последующего конфликта. CAP availability имеет формальное значение ответа на запросы в модели, оно не равно хорошему SLO latency. Практический ответ привязывает выбор к конкретным данным: stale каталог допустим, повторное списание денег обычно нет.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Budget и усиление нагрузки",
+          "body_markdown": "У end-to-end операции есть общий deadline; каждой зависимости оставляют часть budget и время на формирование ответа. Retries расходуют тот же бюджет и безопасны не для всякой операции. Если три слоя делают по три попытки, нижний слой может получить двадцать семь вызовов вместо одного. Bounded retry с backoff и jitter снижает синхронные bursts, но не создаёт недостающую capacity. После timeout upstream работа может продолжаться, поэтому cancellation передают и действительно обрабатывают.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Изоляция и деградация",
+          "body_markdown": "Bounded очереди и concurrency limits предотвращают бесконтрольное накопление requests, а load shedding отклоняет лишнюю работу до дорогостоящих затрат. Circuit breaker временно прекращает вызовы проблемной зависимости и осторожно проверяет восстановление; пороги и область действия требуют измерений. Bulkheads отделяют бюджеты независимых путей. Degraded mode задают явно: отключить рекомендации можно, вернуть выдуманный баланс нельзя. Проверки отказа включают рост backlog, восстановление и отсутствие retry storm.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Обсуждаю partition choice по конкретным операциям.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Распределяю общий deadline между зависимостями.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Считаю retry amplification и допустимость повторов.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Ограничиваю очереди и определяю degraded response.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Три слоя повторяют вызов до трёх попыток. Сколько вызовов возможно внизу?",
+          "short_answer": "До двадцати семи при полном вложенном повторе.",
+          "detailed_answer": "Каждая внешняя попытка снова запускает три внутренних, затем три конечных. Retry policy концентрируют на подходящей границе и ограничивают общим budget.",
+          "pitfalls": "Считать число retries аддитивным.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Поможет ли jitter, если capacity постоянно ниже arrival rate?",
+              "expected_answer": "Он сгладит синхронизацию, но не устранит дефицит; нужны снижение нагрузки, shedding или увеличение реальной capacity.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Можно ли вернуть cached баланс при недоступности primary?",
+          "short_answer": "Только если контракт явно допускает устарелость.",
+          "detailed_answer": "Для просмотра можно показать возраст данных, для решения о списании требуется соответствующая согласованность. Выбор определяется бизнес-инвариантом, а не общей любовью к availability.",
+          "pitfalls": "Заменять неизвестное финансовое состояние успешным ответом.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Очередь без лимита спасает от burst?",
+          "short_answer": "Она переносит проблему в память и latency.",
+          "detailed_answer": "Краткий burst можно сгладить ограниченным buffer. При устойчивом превышении processing rate backlog растёт; лимит и отказ дают управляемую деградацию вместо crash.",
+          "pitfalls": "Считать отсутствие отказов доказательством устойчивости.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Timeout на клиенте истёк. Освободились ли server resources?",
+          "short_answer": "Не обязательно, cancellation нужно передать и обработать.",
+          "detailed_answer": "Context должен дойти до SQL и HTTP calls, loops должны реагировать на Done. Даже отмена не гарантирует rollback уже зафиксированного side effect.",
+          "pitfalls": "Приравнивать конец ожидания клиента к прекращению работы.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Addressing Cascading Failures",
+          "url": "https://sre.google/sre-book/addressing-cascading-failures/",
+          "source_name": "Google SRE",
+          "resource_type": "documentation",
+          "sort_order": 10
+        },
+        {
+          "title": "Handling Overload",
+          "url": "https://sre.google/sre-book/handling-overload/",
+          "source_name": "Google SRE",
+          "resource_type": "documentation",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Проверить отказ медленной зависимости",
+          "description": "Смоделируйте внешний сервис с ростом задержки, bounded queue и двумя бюджетами concurrency для разных endpoint. Сравните bounded retry с немедленным повтором.",
+          "expected_outcome": "Память и inflight ограничены, основной путь сохраняет бюджет, storm обнаруживается по метрикам.",
+          "sort_order": 10
+        }
+      ]
+    }
+  ]
+}

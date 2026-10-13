@@ -1,0 +1,110 @@
+name: track-app-production
+
+x-app-environment: &app-environment
+  APP_ENV: production
+  APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN}
+  APP_ADDR: :8080
+  DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+  SESSION_TTL: ${SESSION_TTL:-168h}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+
+x-job: &job
+  image: ${API_IMAGE:?set API_IMAGE to an immutable image reference}
+  environment: *app-environment
+  networks: [internal]
+  depends_on:
+    postgres:
+      condition: service_healthy
+  security_opt: [no-new-privileges:true]
+  cap_drop: [ALL]
+  read_only: true
+  tmpfs: [/tmp]
+  restart: "no"
+
+services:
+  postgres:
+    image: postgres:18.6-alpine
+    user: postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tracker}
+      POSTGRES_USER: ${POSTGRES_USER:-tracker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    command: [postgres, -c, max_connections=30, -c, shared_buffers=128MB]
+    volumes: [postgres_data:/var/lib/postgresql]
+    networks: [internal]
+    restart: unless-stopped
+    shm_size: 128mb
+    mem_limit: 512m
+    cpus: 1.0
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+  api:
+    <<: *job
+    profiles: []
+    entrypoint: [/app/api]
+    restart: unless-stopped
+    stop_grace_period: 20s
+    mem_limit: 256m
+    cpus: 1.0
+    environment:
+      <<: *app-environment
+      GOMEMLIMIT: 192MiB
+    healthcheck:
+      test: [CMD, /app/healthcheck]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+      start_period: 10s
+  caddy:
+    image: ${WEB_IMAGE:?set WEB_IMAGE to an immutable image reference}
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN}
+    ports: ["80:8080", "443:8443"]
+    networks: [internal, edge]
+    volumes: [caddy_data:/data, caddy_config:/config]
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: 0.5
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: [/tmp]
+    healthcheck:
+      test: [CMD-SHELL, 'curl -fsS --max-time 2 -o /dev/null http://127.0.0.1:8080/api/v1/health/live']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+  migrate:
+    <<: *job
+    profiles: [jobs]
+    entrypoint: [/app/migrate]
+  seed:
+    <<: *job
+    profiles: [jobs]
+    entrypoint: [/bin/sh, -c, 'exec /app/seed /app/seeds/*.json']
+  bootstrap:
+    <<: *job
+    profiles: [bootstrap]
+    entrypoint: [/app/bootstrap]
+    environment:
+      <<: *app-environment
+      BOOTSTRAP_LOGIN: ${BOOTSTRAP_LOGIN:-}
+      BOOTSTRAP_PASSWORD: ${BOOTSTRAP_PASSWORD:-}
+
+networks:
+  internal:
+    internal: true
+  edge:
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

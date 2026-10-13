@@ -1,0 +1,724 @@
+{
+  "version": 1,
+  "category": {
+    "slug": "http-api",
+    "title": "HTTP и API",
+    "description": "Семантика методов, middleware, validation, error contracts, идемпотентность, pagination и устойчивость HTTP API.",
+    "sort_order": 50
+  },
+  "topics": [
+    {
+      "slug": "http-methods-status-rest",
+      "title": "HTTP methods, status codes и REST",
+      "summary": "Связывать semantics методов с ресурсами, retries и наблюдаемым response contract.",
+      "difficulty": "intermediate",
+      "sort_order": 10,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "go-errors-panic-recover"
+      ],
+      "sections": [
+        {
+          "heading": "Ресурсы и semantics",
+          "body_markdown": "REST API задаёт ресурсы и операции через URI и HTTP semantics, а не просто endpoints с JSON. GET предназначен для получения representation и должен иметь safe intent; HEAD получает metadata без response body. PUT задаёт желаемое состояние известного ресурса, POST поручает обработку ресурсу, DELETE удаляет связь с resource URI. PATCH описывает частичное изменение по определённому patch format. Название метода не исправляет произвольную серверную реализацию: контракт обязан соответствовать фактическому effect.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Safe и idempotent",
+          "body_markdown": "Safe означает отсутствие запрошенного изменения состояния, но допускает incidental effects вроде logging. Idempotent означает одинаковый intended effect повторения, а не одинаковый status/body. DELETE может сначала вернуть 204, затем 404 и всё ещё быть идемпотентным. PUT с полным состоянием обычно допускает повтор, но добавление event или счётчика при каждом вызове может нарушить application guarantees. POST не считается идемпотентным по умолчанию, хотя конкретный API способен реализовать deduplication protocol.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Ответ как часть контракта",
+          "body_markdown": "201 обычно описывает создание и может сопровождаться Location, 204 не содержит content, 202 означает принятие без обещания уже завершённой обработки. 400 обозначает неверный запрос, 401 требует соответствующий authentication challenge, 403 — запрет, 404 — отсутствие найденного ресурса, 409 — conflict текущего состояния. 422 уместен для understood content с semantic errors по выбранной policy. Не возвращайте 200 с error payload всем failures: HTTP clients, caches и metrics используют status. Зафиксируйте одинаковую policy для всех endpoints.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "resource",
+          "text": "Описываю ресурсы и intent методов.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "safe",
+          "text": "Различаю safe и idempotent.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "codes",
+          "text": "Выбираю status по результату операции.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "contract",
+          "text": "Учитываю headers и отсутствие body у 204.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "delete-status",
+          "question": "Может ли DELETE быть idempotent при 204 затем 404?",
+          "short_answer": "Да, intended effect одинаков: ресурс отсутствует.",
+          "detailed_answer": "Идемпотентность относится к состоянию сервера от повторной операции, а не байтовому равенству responses. Клиент должен иметь policy трактовки повторного удаления.",
+          "pitfalls": "Не определять идемпотентность по совпадению status.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Всегда ли PATCH idempotent?",
+              "expected_answer": "Нет: установка поля может быть идемпотентной, increment operation — нет; semantics задаёт patch format и операция.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "get-effects",
+          "question": "Нарушает ли access log безопасность GET?",
+          "short_answer": "Incidental logging не меняет safe intent.",
+          "detailed_answer": "Safe semantics запрещает запрошенные destructive changes; инфраструктурные effects неизбежны. Endpoint, удаляющий объект по GET, нарушает intent независимо от query name.",
+          "pitfalls": "Не разрешать destructive GET из-за наличия logs.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "accepted",
+          "question": "Что гарантирует 202 Accepted?",
+          "short_answer": "Запрос принят, но обработка ещё не гарантированно завершена.",
+          "detailed_answer": "Дайте клиенту способ наблюдать результат: operation resource или другой явный protocol. Не выдавайте 202 как подтверждение durable completion без основания.",
+          "pitfalls": "Не трактовать Accepted как Created.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "auth-status",
+          "question": "Чем 401 отличается от 403?",
+          "short_answer": "401 требует authentication, 403 сообщает отказ в доступе.",
+          "detailed_answer": "401 response связан с authentication challenge; application policy должна учитывать concealment существования объектов и безопасные сообщения.",
+          "pitfalls": "Не менять codes произвольно в каждом handler.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "HTTP semantics: RFC 9110",
+          "url": "https://www.rfc-editor.org/rfc/rfc9110.html",
+          "resource_type": "documentation",
+          "source_name": "IETF",
+          "sort_order": 10
+        },
+        {
+          "title": "HTTP PATCH: RFC 5789",
+          "url": "https://www.rfc-editor.org/rfc/rfc5789.html",
+          "resource_type": "documentation",
+          "source_name": "IETF",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Спроектировать ресурс задач",
+          "description": "Опишите GET/PUT/PATCH/DELETE /tasks/{id} и POST /tasks с statuses, Location и повторным выполнением. Реализуйте httptest cases на безопасный GET и empty 204.",
+          "expected_outcome": "Contract различает safe/idempotent и объясняет ответы повторного удаления.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "http-middleware-chain",
+      "title": "Middleware, request context и response lifecycle",
+      "summary": "Собирать cross-cutting обработку в предсказуемом порядке без потери HTTP capabilities.",
+      "difficulty": "intermediate",
+      "sort_order": 20,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "interfaces",
+        "go-functions-defer"
+      ],
+      "sections": [
+        {
+          "heading": "Композиция handlers",
+          "body_markdown": "Middleware принимает handler и возвращает новый handler, например func(next http.Handler) http.Handler. Внешний слой выполняется первым до next и последним после возврата. Поэтому request ID должен быть доступен logging/recovery слоям, authentication — предшествовать handler protected route, а metrics учитывать весь нужный interval. Middleware может прекратить цепочку, записав failure и не вызывая next; повторный next обычно вызывает двойные effects. Порядок должен быть явным и проверенным сценариями.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Context и cleanup",
+          "body_markdown": "Request-scoped metadata помещайте в context через private typed key и передавайте r.WithContext(ctx). Не храните current request в package global: concurrent handlers смешают пользователей и traces. Deferred cleanup выполняется после next, но panic requires recovery boundary в той же goroutine. Recovery может отправить error лишь пока response не committed; после partial streaming нельзя правдиво заменить status на 500. Логируйте факт panic и request ID без секретов и raw body.",
+          "sort_order": 20
+        },
+        {
+          "heading": "ResponseWriter wrapper",
+          "body_markdown": "Обёртка для status/bytes metrics должна учитывать неявный 200 на Write и один финальный status, а также capabilities streaming/hijacking. Простая struct, реализующая только Write/Header/WriteHeader, может скрыть Flusher или другие interfaces и сломать streaming/WebSocket consumers. ResponseController использует документированный путь unwrap для доступа к controller operations; явно определите поддерживаемые capabilities и тестируйте их. Request duration до возврата handler и duration фоновой задачи — разные измерения, не смешивайте их в одной метрике.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "order",
+          "text": "Объясняю вход/выход middleware chain.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "context",
+          "text": "Храню request metadata в typed context.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "committed",
+          "text": "Учитываю committed response при recovery.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "writer",
+          "text": "Сохраняю нужные capabilities writer wrapper.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "order",
+          "question": "Как исполняется A(B(handler))?",
+          "short_answer": "До handler: A, B; после: B, A.",
+          "detailed_answer": "Если слой вызывает next один раз, вложенность задаёт этот порядок. Short-circuit может завершить цепочку раньше; deferred actions всё равно выполняются.",
+          "pitfalls": "Не читать порядок записи middleware как независимый список callbacks.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Где измерять authentication failure?",
+              "expected_answer": "Metrics/logging слой должен оборачивать auth, если эти failures входят в измеряемый request contract.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "panic-stream",
+          "question": "Можно ли после panic заменить streaming 200 на 500?",
+          "short_answer": "Нет, уже отправленный final status не переписывается.",
+          "detailed_answer": "Recovery завершает работу и регистрирует failure, но response contract должен учитывать partial output. Для atomic JSON output можно подготовить payload до записи.",
+          "pitfalls": "Не отправлять второй JSON error после partial successful body.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "wrapper",
+          "question": "Почему metrics wrapper ломает SSE?",
+          "short_answer": "Может скрыть Flush capability.",
+          "detailed_answer": "Consumer ожидает поддержку flushing; wrapper должен сохранить или корректно unwrap нужные операции. Тестируйте фактический interface/controller path.",
+          "pitfalls": "Не считать три базовых метода полным contract ResponseWriter.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "global-id",
+          "question": "Почему global request ID недопустим?",
+          "short_answer": "Concurrent requests перезаписывают общий state.",
+          "detailed_answer": "ID должен принадлежать конкретному request и передаваться через context/explicit dependency. Global создаёт races и неверную attribution logs.",
+          "pitfalls": "Не защищать global mutex вместо корректного request ownership.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "net/http Handler and ResponseController",
+          "url": "https://pkg.go.dev/net/http",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "context values",
+          "url": "https://pkg.go.dev/context",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Проверить цепочку",
+          "description": "Сделайте request ID, logging, recovery и auth middleware с recording fake. Проверьте order, short-circuit, implicit 200 и Flusher/ResponseController behavior wrapper.",
+          "expected_outcome": "Observability видит auth failures, capabilities не теряются, ID изолирован между requests.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "http-validation-errors",
+      "title": "Validation и единый error contract",
+      "summary": "Разделять parsing, structural и business validation с безопасной классификацией ошибок.",
+      "difficulty": "intermediate",
+      "sort_order": 30,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "go-errors-panic-recover",
+        "go-types-zero-values"
+      ],
+      "sections": [
+        {
+          "heading": "Несколько границ validation",
+          "body_markdown": "Сначала ограничьте body size и проверьте media type по contract, затем декодируйте ровно один документ. Structural validation проверяет presence, тип, длину и диапазон; business validation — доступность перехода состояния или уникальность по реальным данным. Не смешивайте проверку input с авторизацией на объект. Empty string, omitted field и null могут иметь разный intent; policy PATCH обязана сохранять эти различия. Ошибки клиента нужно выявить до частичного side effect, где это возможно.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Машинный и человеческий ответ",
+          "body_markdown": "Error contract содержит стабильный code для клиента, безопасный message для человека, fields для исправления form и request ID для support. RFC 9457 предлагает стандартный problem details format, но существующий JSON envelope тоже может быть последовательным и документированным contract. Не помещайте SQL, stack trace, credentials и raw internal error в message. Внутренняя причина остаётся в защищённых logs с correlation ID; внешний code не должен требовать парсинга текста ошибки.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Классификация и изменения",
+          "body_markdown": "Typed errors и errors.Is/As позволяют service слой передать semantic failure HTTP adapter без зависимости от конкретного status. Adapter отображает validation, not found, conflict и unexpected failures по единой таблице. Не объявляйте любое driver error клиентской ошибкой: connection loss обычно internal/unavailable, а constraint violation требует безопасной business classification. Client retries не должны зависеть от произвольной формулировки message. При добавлении error fields сохраняйте старые codes и не раскрывайте наличие чужого protected resource.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "layers",
+          "text": "Разделяю parsing, structural и business validation.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "limits",
+          "text": "Ограничиваю input до decode.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "safe",
+          "text": "Отдаю безопасный message и стабильный code.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "mapping",
+          "text": "Классифицирую errors через единый adapter.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "syntax-business",
+          "question": "Чем JSON syntax error отличается от business conflict?",
+          "short_answer": "Первый не позволяет разобрать input, второй нарушает состояние операции.",
+          "detailed_answer": "Синтаксис проверяет decoder; конфликт может появиться только после чтения текущего состояния или database constraint. Policy statuses и codes должна отражать различие.",
+          "pitfalls": "Не возвращать общий validation_error на connection failure.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Как локализовать messages без поломки clients?",
+              "expected_answer": "Сохранять code и machine fields стабильными; человеческий message можно переводить, если клиенты не парсят его.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "raw-error",
+          "question": "Почему нельзя отправлять err.Error() клиенту?",
+          "short_answer": "Он может раскрыть internal details и нестабилен.",
+          "detailed_answer": "Driver errors содержат SQL/constraint names, filesystem errors — paths, upstream errors — инфраструктуру. Mapping даёт безопасный contract, logs сохраняют причину.",
+          "pitfalls": "Не считать текст Go error публичным API.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "field-required",
+          "question": "Почему required age нельзя проверять age!=0?",
+          "short_answer": "Zero может быть допустимым явно переданным значением.",
+          "detailed_answer": "Presence и range проверяются отдельно. DTO pointer или wrapper должны сохранять intent отсутствия, null и числа.",
+          "pitfalls": "Не объединять missing и out-of-range в случайную проверку zero.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "db-unique",
+          "question": "Зачем constraint после предварительной unique validation?",
+          "short_answer": "Между проверкой и записью есть concurrent race.",
+          "detailed_answer": "Database unique constraint является окончательной защитой invariant. Adapter классифицирует violation, а precheck может только улучшить UX.",
+          "pitfalls": "Не гарантировать уникальность одним SELECT перед INSERT.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Problem details: RFC 9457",
+          "url": "https://www.rfc-editor.org/rfc/rfc9457.html",
+          "resource_type": "documentation",
+          "source_name": "IETF",
+          "sort_order": 10
+        },
+        {
+          "title": "net/http.MaxBytesReader",
+          "url": "https://pkg.go.dev/net/http#MaxBytesReader",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Сделать validation boundary",
+          "description": "Реализуйте POST с ограничением body, одним документом, presence/range checks и mapping typed errors. Покройте malformed, oversized, conflict и unexpected error.",
+          "expected_outcome": "Ни один response не раскрывает SQL/stack; client различает errors по code и корректирует field errors.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "http-idempotency-retries",
+      "title": "Idempotency keys и безопасные retries",
+      "summary": "Обрабатывать неизвестный результат side effect через deduplication и общий retry budget.",
+      "difficulty": "intermediate",
+      "sort_order": 40,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "go-errors-panic-recover",
+        "go-maps"
+      ],
+      "sections": [
+        {
+          "heading": "Неизвестный результат",
+          "body_markdown": "Timeout клиента не доказывает, что сервер не выполнил операцию: response мог потеряться после commit. Поэтому повтор POST создания заказа способен создать второй заказ. Idempotency key связывает попытки одной логической операции и позволяет вернуть прежний результат. Scope ключа включает identity и operation; один и тот же key с другим payload должен давать conflict по contract. Клиент обязан переиспользовать key при retry, а для новой операции создавать новый, даже если payload совпадает.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Atomic deduplication",
+          "body_markdown": "Сервер хранит key, fingerprint запроса, состояние и результат с заданным retention. Конкурентные requests с одним key не должны оба выполнить effect: unique constraint и transaction или иной атомарный protocol сериализуют ownership. Простая последовательность SELECT cache, затем INSERT effect допускает race. Если effect выходит в внешний сервис, локальная transaction сама по себе не обеспечивает exactly once: нужны downstream idempotency, outbox/state machine или reconciliation. TTL истечения определяет, когда повтор снова может стать новой операцией.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Retry policy",
+          "body_markdown": "Повторяйте только transient failures и операции, для которых повтор безопасен или защищён key. Используйте ограниченное число attempts, exponential backoff с jitter и общий deadline; соблюдайте Retry-After, когда это возможно в бюджете. Validation/auth failures обычно не исправляются повторением. Retry на нескольких слоях умножает load и attempts; назначьте владельца retry policy. При unknown outcome сообщите корректный статус/operation reference вместо уверенного заявления о неисполнении. Backoff снижает давление, но не лечит постоянную перегрузку.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "unknown",
+          "text": "Различаю failure response и неизвестный effect.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "key",
+          "text": "Сохраняю ключ между attempts одной операции.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "atomic",
+          "text": "Защищаю deduplication от concurrent attempts.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "budget",
+          "text": "Ограничиваю retries общим deadline и jitter.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "timeout",
+          "question": "Почему timeout POST опасно повторять?",
+          "short_answer": "Side effect мог завершиться до потери ответа.",
+          "detailed_answer": "Клиент видит отсутствие подтверждения, а не отсутствие commit. Key или operation-status protocol позволяет безопасно разрешить неопределённость.",
+          "pitfalls": "Не трактовать DeadlineExceeded как rollback.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Гарантирует ли локальный key exactly once во внешней платёжной системе?",
+              "expected_answer": "Нет, нужен protocol с внешней системой или reconciliation неизвестного outcome; local DB transaction не охватывает внешний effect.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "key-payload",
+          "question": "Как реагировать на прежний key с другим payload?",
+          "short_answer": "Отклонить по явному conflict contract.",
+          "detailed_answer": "Fingerprint и scope позволяют обнаружить неправильное переиспользование. Возвращать старый result для нового intent значит скрыть ошибку клиента.",
+          "pitfalls": "Не сравнивать только key без user/operation scope.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "two-requests",
+          "question": "Почему in-memory check-then-act недостаточен?",
+          "short_answer": "Concurrent attempts оба могут пройти check.",
+          "detailed_answer": "Нужна атомарная регистрация ownership; distributed instances требуют общего durable protocol, а restart не должен терять completed key до retention.",
+          "pitfalls": "Не обещать exactly once через обычную map.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "retry-storm",
+          "question": "Как retries могут усугубить outage?",
+          "short_answer": "Каждая попытка добавляет нагрузку, особенно на нескольких слоях.",
+          "detailed_answer": "Ограничьте attempts и budget, примените jitter, не повторяйте permanent errors и наблюдайте amplification.",
+          "pitfalls": "Не повторять любой 4xx/5xx немедленно и бесконечно.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "HTTP semantics: retries and idempotency",
+          "url": "https://www.rfc-editor.org/rfc/rfc9110.html",
+          "resource_type": "documentation",
+          "source_name": "IETF",
+          "sort_order": 10
+        },
+        {
+          "title": "Retry-After header",
+          "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Retry-After",
+          "resource_type": "documentation",
+          "source_name": "MDN",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Смоделировать потерю ответа",
+          "description": "Создайте handler, который фиксирует effect и теряет первый response. Повторите с прежним key; добавьте concurrent same-key и different-payload scenarios.",
+          "expected_outcome": "Effect применяется один раз в пределах выбранного protocol; conflict и TTL поведение объяснены.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "http-pagination-versioning",
+      "title": "Pagination, filtering и versioning",
+      "summary": "Задавать детерминированные страницы и менять API без неожиданных semantic breaks.",
+      "difficulty": "intermediate",
+      "sort_order": 50,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "go-maps",
+        "go-types-zero-values"
+      ],
+      "sections": [
+        {
+          "heading": "Порядок как обязательный contract",
+          "body_markdown": "Pagination требует стабильного порядка с уникальным tie-breaker: ORDER BY created_at DESC, id DESC. Одного timestamp недостаточно, когда несколько rows равны. Ограничьте page size, валидируйте filter/sort и не подставляйте untrusted sort прямо в SQL; используйте allowlist. Offset прост и допускает переход к page N, но дорог при больших offsets и нестабилен при concurrent inserts/deletes. Клиент должен знать, обещается ли snapshot или лишь traversal изменяющегося набора.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Keyset и opaque cursor",
+          "body_markdown": "Keyset cursor переносит последнее значение всех полей sort, а следующий запрос выбирает rows после этой границы. Для DESC tuple это обычно условие (created_at,id)<($1,$2). Cursor связывают с filters, sort и version; иначе клиент может продолжить другой набор в несовместимом порядке. Base64 кодирование скрывает representation только визуально, не гарантирует integrity. Если tampering меняет доступ или дороговизну запроса, нужна проверка/signature. Keyset не предоставляет произвольную page N и не фиксирует snapshot сам по себе.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Эволюция API",
+          "body_markdown": "Versioning нужен при несовместимом изменении contract, а не при каждом новом endpoint. Добавление optional field часто совместимо, но строгие клиенты и enum handling могут сделать даже additive change ломаюшим. Не меняйте meaning существующего field/code и defaults sorting незаметно. Выберите URI/header strategy и lifecycle old versions с наблюдением usage и сроком migration. Pagination cursor version позволяет отвергать или преобразовывать старые cursors после изменения representation. Contract tests проверяют примеры старых clients.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "order",
+          "text": "Использую уникальный tie-breaker.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "cursor",
+          "text": "Связываю cursor с filters и sort.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "limits",
+          "text": "Ограничиваю page size и sort allowlist.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "version",
+          "text": "Оцениваю semantic compatibility изменения.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "ties",
+          "question": "Почему ORDER BY created_at недостаточно?",
+          "short_answer": "Rows с одинаковым временем не имеют определённого относительного порядка.",
+          "detailed_answer": "Страницы могут повторить или пропустить элементы при различном порядке равных rows. Добавьте уникальный id и включите его в cursor.",
+          "pitfalls": "Не считать timestamp гарантированно уникальным.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Почему page size обязан иметь maximum?",
+              "expected_answer": "Ограничивает память, query cost и размер response; значение пользователя не должно обходить resource budget.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "keyset-snapshot",
+          "question": "Гарантирует ли keyset неизменный snapshot?",
+          "short_answer": "Нет, он задаёт границу traversal, а не snapshot.",
+          "detailed_answer": "Concurrent изменения могут менять набор; для строгой consistent export нужен отдельный snapshot/version protocol.",
+          "pitfalls": "Не обещать pagination без любых изменений только из-за cursor.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "base64",
+          "question": "Защищает ли Base64 cursor от подделки?",
+          "short_answer": "Нет, кодирование не является подписью.",
+          "detailed_answer": "Input всё равно требует validation и access checks. Подпись полезна для integrity server-generated cursor, но не заменяет authorization.",
+          "pitfalls": "Не хранить secret в cursor, считая Base64 encryption.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "add-field",
+          "question": "Всегда ли добавление JSON field совместимо?",
+          "short_answer": "Нет, зависит от поведения клиентов и contract.",
+          "detailed_answer": "Strict decoders могут отвергать unknown fields, новые enum variants — ломать exhaustive logic. Обратная совместимость требует реальных consumer assumptions.",
+          "pitfalls": "Не классифицировать изменения только по отсутствию удаления fields.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "HTTP semantics and representation metadata",
+          "url": "https://www.rfc-editor.org/rfc/rfc9110.html",
+          "resource_type": "documentation",
+          "source_name": "IETF",
+          "sort_order": 10
+        },
+        {
+          "title": "Google API design: pagination",
+          "url": "https://google.aip.dev/158",
+          "resource_type": "documentation",
+          "source_name": "Google",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Сделать cursor pagination",
+          "description": "На наборе с одинаковыми timestamps реализуйте descending keyset по time/id, filters и bounded limit. Добавьте insert между страницами и invalid cursor scenarios.",
+          "expected_outcome": "Tie-breaker предотвращает произвольный порядок; contract честно описывает concurrency и cursor compatibility.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "http-timeouts-rate-limits",
+      "title": "Timeouts, rate limits и overload policy",
+      "summary": "Ограничивать время и нагрузку на каждом network этапе с пониманием net/http semantics.",
+      "difficulty": "intermediate",
+      "sort_order": 60,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "go-errors-panic-recover",
+        "go-types-zero-values"
+      ],
+      "sections": [
+        {
+          "heading": "Timeout не один",
+          "body_markdown": "У HTTP server ReadHeaderTimeout ограничивает чтение headers; ReadTimeout включает чтение всего request, WriteTimeout ограничивает writes с documented lifecycle, IdleTimeout — ожидание следующего keep-alive request. Эти connection deadlines не равны cancellation CPU работы handler. TimeoutHandler ограничивает response lifecycle своей обёрткой, но task обязана кооперативно реагировать на context; streaming имеет отдельные ограничения. Выберите значения по payload и профилю endpoints: short JSON и long stream требуют разной policy.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Исходящий бюджет",
+          "body_markdown": "Client.Timeout охватывает connection, redirects и чтение response body. Transport имеет отдельные DialContext, TLSHandshakeTimeout, ResponseHeaderTimeout и idle settings; задержки разных этапов не заменяют общий deadline. Request context переносит бюджет service operation, включая pool wait и retry backoff. Нулевые значения у разных fields означают разные defaults/отсутствие ограничения, поэтому не полагайтесь на один глобальный timeout. При graceful shutdown дайте inflight requests ограниченное время и отмените background work отдельным lifecycle signal.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Ограничение нагрузки",
+          "body_markdown": "Rate limiting ограничивает частоту, concurrency limiting — число активных operations, bounded queue — память ожидания. Token bucket допускает burst по capacity и refill rate; ключ user/IP выбирайте по threat model, а proxy headers доверяйте только trusted proxies. 429 сообщает слишком много requests и может содержать Retry-After; 503 отражает unavailable/overload policy сервиса. Неограниченная очередь ухудшает p99 и удержание памяти. Наблюдайте rejected, wait time и inflight, избегая sensitive/high-cardinality labels.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "stages",
+          "text": "Различаю server timeout fields.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "context",
+          "text": "Не путаю write deadline с остановкой handler.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "limits",
+          "text": "Различаю rate и concurrency limits.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "overload",
+          "text": "Задаю bounded wait/reject policy и метрики.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "write-cancel",
+          "question": "Остановит ли WriteTimeout CPU loop handler?",
+          "short_answer": "Нет, write deadline не является убийством handler.",
+          "detailed_answer": "Он ограничивает операции записи на connection. Handler должен слушать context и иметь собственный bounded computation protocol.",
+          "pitfalls": "Не объявлять CPU protection только настройкой WriteTimeout.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Как совместить Retry-After и общий deadline?",
+              "expected_answer": "Ждать только если budget позволяет новую попытку; иначе вернуть failure, сохранив ограничение общего времени.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "client-body",
+          "question": "Покрывает ли Client.Timeout чтение body после Do?",
+          "short_answer": "Да, его budget включает чтение response body.",
+          "detailed_answer": "Timeout продолжает действовать после возврата headers и может прервать Body.Read. Для stream нужна подходящая policy с context/пер-operation deadlines.",
+          "pitfalls": "Не считать Do return концом client timeout window.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "rate-concurrency",
+          "question": "Может ли низкий RPS всё равно перегрузить service?",
+          "short_answer": "Да, если requests долгие и много inflight.",
+          "detailed_answer": "Rate ограничивает arrivals, но long durations накапливают активные operations. Concurrency cap и bounded queue контролируют другой resource dimension.",
+          "pitfalls": "Не считать один token bucket полным memory budget.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "proxy-ip",
+          "question": "Можно ли брать любой X-Forwarded-For для rate key?",
+          "short_answer": "Нет, header может быть подделан.",
+          "detailed_answer": "Доверяйте цепочке только от configured trusted proxies и выберите parsing policy. Иначе attacker меняет key или блокирует чужого клиента.",
+          "pitfalls": "Не доверять client-controlled proxy headers автоматически.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "net/http timeout contracts",
+          "url": "https://pkg.go.dev/net/http",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "429 Too Many Requests: RFC 6585",
+          "url": "https://www.rfc-editor.org/rfc/rfc6585.html",
+          "resource_type": "documentation",
+          "source_name": "IETF",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Проверить slow и overload paths",
+          "description": "Создайте httptest client scenarios с медленными headers/body, затем limiter с burst и max inflight. Проверьте cancellation и 429/503 policy без unbounded queue.",
+          "expected_outcome": "Timeout budgets относятся к конкретным этапам; limiter ограничивает arrivals и active work независимо.",
+          "sort_order": 10
+        }
+      ]
+    }
+  ]
+}

@@ -28,11 +28,11 @@ export function TopicListPage({ mode }: { mode: Mode }) {
   })
   const mutation = useMutation({
     mutationFn: ({ topic, status }: { topic: Topic; status: Status }) => apiRequest(`/topics/${encodeURIComponent(topic.slug)}/progress`, { method: 'PUT', body: JSON.stringify({ status, review_required: topic.review_required ?? false }) }),
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: ['topics'] })
-      void client.invalidateQueries({ queryKey: ['topic'] })
-      void client.invalidateQueries({ queryKey: ['dashboard'] })
-    },
+    onSuccess: () => Promise.all([
+      client.invalidateQueries({ queryKey: ['topics'] }),
+      client.invalidateQueries({ queryKey: ['topic'] }),
+      client.invalidateQueries({ queryKey: ['dashboard'] }),
+    ]),
     onSettled: () => { inFlight.current = false },
   })
   function search(event: FormEvent<HTMLFormElement>) {

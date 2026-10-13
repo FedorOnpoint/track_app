@@ -1,0 +1,722 @@
+{
+  "version": 1,
+  "category": {
+    "slug": "testing",
+    "title": "Тестирование",
+    "description": "Детерминированные unit tests, test doubles, HTTP и PostgreSQL integration, race, fuzzing и измерения.",
+    "sort_order": 80
+  },
+  "topics": [
+    {
+      "slug": "testing-table-subtests",
+      "title": "Table-driven tests, subtests и cleanup",
+      "summary": "Проверять поведение набором читаемых случаев и изолировать lifecycle тестовых ресурсов.",
+      "difficulty": "intermediate",
+      "sort_order": 10,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "go-functions-defer",
+        "go-errors-panic-recover"
+      ],
+      "sections": [
+        {
+          "heading": "Таблица как спецификация случаев",
+          "body_markdown": "Table-driven test хранит вход, ожидаемый результат и имя сценария отдельно от одинакового кода запуска. Полезные случаи следуют из контракта: пустой input, граница, неверное значение и обычный путь. Не добавляйте десятки случайных чисел только ради количества строк. Для validator проверьте отдельно допустимый статус, неизвестный статус и запрет перехода. Ошибка должна сообщать имя случая и значения got/want, чтобы падение было объяснимо без debugger.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Subtests и независимость",
+          "body_markdown": "t.Run создаёт именованный subtest: его можно выбрать через go test -run, а ошибка локализуется до конкретного сценария. t.Parallel разрешает конкурентное выполнение и требует независимых изменяемых данных. Общая map, временная схема БД или mutable fake может сделать тесты зависимыми от порядка. Современная семантика переменной range не устраняет aliasing вложенных объектов: копия структуры со slice всё ещё может разделять память с другой копией.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Cleanup и helpers",
+          "body_markdown": "t.Cleanup регистрирует освобождение ресурса после завершения теста и его subtests; это особенно полезно для parallel subtests, жизненный цикл которых отличается от обычного defer в родительской функции. t.TempDir создаёт изолированный временный каталог. t.Helper убирает вспомогательный frame из диагностики ошибки. Helpers должны упрощать setup и сравнение, а не скрывать главное утверждение. Тест ожидаемой ошибки проверяет errors.Is или тип по контракту, а не случайный текст внутреннего сообщения.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Выбираю случаи из контракта и границ.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Даю subtests понятные имена.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Изолирую mutable данные при Parallel.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Использую Cleanup для общего ресурса.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Когда table-driven test полезнее нескольких функций?",
+          "short_answer": "Когда код запуска одинаков, а сценарии различаются данными.",
+          "detailed_answer": "Таблица делает набор входов и ожиданий обозримым. Если setup и assertions каждого случая существенно различны, отдельные тесты могут быть понятнее универсального harness.",
+          "pitfalls": "Не создавать таблицу с десятком callbacks ради формата.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Как выбрать только один subtest?",
+              "expected_answer": "Передать регулярное выражение имени через go test -run с частью имени родительского теста и subtest.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Почему defer в родительском тесте может рано закрыть ресурс?",
+          "short_answer": "Parallel subtests продолжают lifecycle после возврата родителя.",
+          "detailed_answer": "t.Cleanup выполняется после descendants, поэтому общий ресурс остаётся доступным их проверкам. Обычный defer относится только к возврату функции родителя.",
+          "pitfalls": "Не считать defer и Cleanup полностью равнозначными.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Достаточно ли исправить захват range-переменной для Parallel?",
+          "short_answer": "Нет, вложенные объекты тоже могут быть общими.",
+          "detailed_answer": "Сценарии могут ссылаться на одну map, pool schema или fake. Создайте отдельные mutable объекты и не меняйте глобальную конфигурацию одновременно.",
+          "pitfalls": "Не объяснять любую гонку только closure loop variable.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Зачем вызывать t.Helper?",
+          "short_answer": "Чтобы ошибка указывала на вызывающий тест.",
+          "detailed_answer": "Helper помечает вспомогательный код; testing исключает его frame при указании места ошибки. Это улучшает диагностику, но не заменяет содержательные got/want сообщения.",
+          "pitfalls": "Не прятать всю логику теста в generic helper.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "testing package",
+          "url": "https://pkg.go.dev/testing",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Using subtests and sub-benchmarks",
+          "url": "https://go.dev/blog/subtests",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Проверить validator",
+          "description": "Напишите таблицу сценариев перехода статуса с именованными subtests, errors.Is и общим ресурсом через Cleanup; разрешите Parallel только для независимых случаев.",
+          "expected_outcome": "Падение показывает конкретное правило и expected результат; тесты не зависят от порядка.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "testing-fakes-mocks-contracts",
+      "title": "Mocks, fakes и контрактные тесты",
+      "summary": "Заменять внешние эффекты на нужном уровне и не тестировать порядок внутренних вызовов без причины.",
+      "difficulty": "intermediate",
+      "sort_order": 20,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "interfaces",
+        "testing-table-subtests"
+      ],
+      "sections": [
+        {
+          "heading": "Разные test doubles",
+          "body_markdown": "Stub возвращает заранее заданный ответ, fake содержит упрощённую работающую реализацию, а mock проверяет ожидаемые взаимодействия. In-memory store подходит для проверки смены статуса, но не воспроизводит SQL isolation. Mock sender полезен, если контракт требует отправить ровно одно сообщение после успешной операции. Названия менее важны, чем поведение двойника: укажите, какие гарантии он моделирует, а какие оставляет integration tests.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Наблюдаемый результат и interaction",
+          "body_markdown": "Тест бизнес-правила обычно проверяет результат и состояние, а не каждый приватный шаг алгоритма. Жёсткая последовательность вызовов repository делает refactoring болезненным, даже если итог остаётся правильным. Interaction assertions уместны для существенных эффектов: отсутствие отправки при rollback, propagation context или ограничение retries. Fake должен возвращать контрактные ошибки и соблюдать ownership; иначе тест может пройти на поведении, которого настоящая реализация не имеет.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Согласование реализаций",
+          "body_markdown": "Один набор контрактных тестов можно запускать для fake и PostgreSQL adapter: сохранение, not found, сортировка, conflict. Это выявляет расхождение их публичного поведения, но не делает fake моделью всех блокировок БД. Не вводите большое mocking framework там, где достаточно короткой структуры с функцией. Параллельные тесты требуют собственного двойника или синхронизации его состояния. Сам fake не должен копировать проверяемое бизнес-правило, иначе два одинаково ошибочных алгоритма подтверждают друг друга.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Различаю stub, fake и mock по поведению.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Проверяю существенные эффекты.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Запускаю общий контракт для реализаций.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Не копирую бизнес-алгоритм в fake.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Почему тест ломается после безвредного refactoring?",
+          "short_answer": "Он мог проверять внутреннюю последовательность вместо контракта.",
+          "detailed_answer": "Изменение числа чтений repository допустимо, если результат и эффекты сохраняются. Оставьте обязательные interactions, а прочие assertions привяжите к наблюдаемому состоянию.",
+          "pitfalls": "Не удалять проверку обязательного эффекта ради стабильности теста.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Почему fake с общей map опасен в Parallel?",
+              "expected_answer": "Он создаёт data race или межтестовое влияние; нужны отдельные экземпляры либо явно синхронизированная реализация с изоляцией данных.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Может ли fake доказать корректность SQL?",
+          "short_answer": "Нет, SQL вообще не выполняется.",
+          "detailed_answer": "Fake проверяет использование порта бизнес-кодом. Migration, scan, constraints и transaction проверяют с настоящей БД; контрактный suite дополняет, а не заменяет integration testing.",
+          "pitfalls": "Не называть in-memory store интеграционным тестом PostgreSQL.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Когда mock полезен?",
+          "short_answer": "Когда взаимодействие является частью существенного поведения.",
+          "detailed_answer": "Например, сообщение не должно отправляться при отказе хранения или внешняя операция имеет лимит повторов. Проверяйте такие гарантии, не закрепляя незначимые приватные шаги.",
+          "pitfalls": "Не ожидать каждый getter только потому, что инструмент умеет.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Как не допустить drift fake?",
+          "short_answer": "Проверять одинаковый публичный контракт на обеих реализациях.",
+          "detailed_answer": "Общий suite создаёт store через factory и проверяет ошибки, порядок выдачи и updates. Специфичные PostgreSQL сценарии остаются отдельными.",
+          "pitfalls": "Не пытаться воспроизвести MVCC несколькими map locks.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Effective Go: interfaces",
+          "url": "https://go.dev/doc/effective_go#interfaces_and_types",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "testing package",
+          "url": "https://pkg.go.dev/testing",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Сверить stores",
+          "description": "Сделайте fake store и общий contract suite для Save/Get/not-found/conflict. Запустите тот же suite на локальном PostgreSQL adapter.",
+          "expected_outcome": "Одинаковые ожидания выполняются обеими реализациями, SQL-поведение проверяется отдельно.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "testing-http-handlers",
+      "title": "HTTP-тесты с httptest",
+      "summary": "Проверять handler contracts отдельно от сетевого lifecycle и middleware composition.",
+      "difficulty": "intermediate",
+      "sort_order": 30,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "testing-fakes-mocks-contracts"
+      ],
+      "sections": [
+        {
+          "heading": "Handler без настоящего listener",
+          "body_markdown": "httptest.NewRequest создаёт server-side request, ResponseRecorder собирает status, headers и body при прямом вызове ServeHTTP. Для JSON endpoint проверяйте корректный Content-Type, status и семантические поля decoded JSON. Сравнение сырой строки привязывает тест к порядку полей и пробелам, которые не являются контрактом. Негативные случаи включают неверный метод, malformed JSON, лишний объём и неавторизованный доступ, если обработчик отвечает за эту границу.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Полный router и настоящий HTTP",
+          "body_markdown": "Тест отдельного handler не подтверждает регистрацию маршрута или порядок middleware. Запускайте httptest.NewServer с production router, когда проверяете путь, cookies, redirect и взаимодействие клиента с сервером. NewTLSServer позволяет проверить HTTPS-клиентскую сторону, но тестовый сертификат и доверие отличаются от production. Сервер и client имеют lifecycle; закрывайте ресурсы и тела ответов. Для streaming поведение ResponseRecorder может быть недостаточно близко к настоящему соединению.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Ошибки и побочные эффекты",
+          "body_markdown": "При недоступной БД handler должен вернуть стабильный error contract, а не SQL или stack trace. Fake service может намеренно возвращать доменный conflict, чтобы проверить mapping в status. Проверяйте отсутствие записи для невалидного input, а не только 400. Cancellation тестируйте управляемым context и сигналом выполнения, без ненадёжного sleep. Граница теста должна быть названа честно: прямой handler call не проверяет reverse proxy, реальные TLS-настройки и production timeouts.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Проверяю JSON по структуре.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Различаю Recorder и NewServer.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Проверяю router вместе с middleware.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Проверяю отсутствие эффекта при validation error.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Когда достаточно ResponseRecorder?",
+          "short_answer": "Для поведения отдельного handler при прямом вызове.",
+          "detailed_answer": "Можно проверить status, headers и body без сети. Регистрация маршрута, client redirects и cookies требуют router или test server в зависимости от задачи.",
+          "pitfalls": "Не заявлять покрытие TLS прямым вызовом ServeHTTP.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Что проверить в ошибке 500?",
+              "expected_answer": "Стабильный публичный код и отсутствие SQL, credentials и stack trace; техническую причину проверяют в отдельной диагностике.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Почему сравнение JSON строк ломает хороший тест?",
+          "short_answer": "Порядок полей и форматирование обычно не часть контракта.",
+          "detailed_answer": "Decode в структуру или map и сравните значения. Дополнительно проверьте отсутствие внутренних полей и корректные headers, если они обязательны.",
+          "pitfalls": "Не ослаблять проверку до простого наличия подстроки.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Как проверить, что middleware защищает маршрут?",
+          "short_answer": "Вызвать полный router без сессии и с валидной сессией.",
+          "detailed_answer": "Изолированный handler может обходить auth middleware. Тест composition проверяет реальный path и status, включая отсутствие бизнес-эффекта в запрещённом запросе.",
+          "pitfalls": "Не подменять router тестовым набором routes.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Как детерминированно проверить cancellation?",
+          "short_answer": "Синхронизировать начало работы и явно отменить context.",
+          "detailed_answer": "Fake сообщает о входе через channel, затем ждёт ctx.Done. Тест отменяет context после этого сигнала и проверяет завершение по deadline.",
+          "pitfalls": "Не угадывать момент работы фиксированным sleep.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "httptest package",
+          "url": "https://pkg.go.dev/net/http/httptest",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "net/http package",
+          "url": "https://pkg.go.dev/net/http",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Проверить endpoint",
+          "description": "Для обновления прогресса добавьте случаи valid JSON, malformed JSON, conflict и отсутствие session через production router; fake считайте вызовы записи.",
+          "expected_outcome": "Status и error fields соответствуют контракту; невалидный и запрещённый запрос не меняют состояние.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "testing-integration-testcontainers",
+      "title": "Integration tests и Testcontainers",
+      "summary": "Проверять PostgreSQL adapters в изолированном окружении с настоящими миграциями.",
+      "difficulty": "intermediate",
+      "sort_order": 40,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "testing-fakes-mocks-contracts"
+      ],
+      "sections": [
+        {
+          "heading": "Что проверяет интеграция",
+          "body_markdown": "Integration test соединяет реальные компоненты на выбранной границе: SQL adapter и PostgreSQL проверяют запрос, scan, constraints и transaction. Контейнер делает создание окружения воспроизводимым, но не заменяет проектирование assertions. Тест с той же SQL-командой в setup и проверке может пропустить ошибку бизнес-сценария. Используйте production migrations, задавайте минимальные данные и проверяйте наблюдаемый результат через публичную операцию.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Готовность и изоляция",
+          "body_markdown": "Запущенный container ещё не означает готовую БД. Wait strategy и успешное соединение должны предшествовать migrations и тестам. Фиксированный sleep делает suite медленным и нестабильным. Выберите изоляцию: контейнер, database или schema на suite/test; rollback годится только если код действительно использует общую transaction. Параллельные тесты не должны очищать одну shared таблицу. Testcontainers требует доступного container runtime; отсутствие Docker должно быть явно обозначено инфраструктурой запуска, а не скрытым успешным прохождением.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Lifecycle и честный scope",
+          "body_markdown": "Container terminate регистрируют сразу после создания, а строки и соединения закрывают независимо от успеха assertion. Версию образа фиксируют для повторяемости; latest меняет среду без diff. Тестовые credentials не являются production secrets, но нельзя подключать suite к боевой БД. Проверьте rollback при отказе второго шага, unique conflict и применение миграций на пустую базу. Один контейнер не моделирует replication, failover и производительность production.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Запускаю production migrations.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Жду готовность по условию.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Изолирую данные parallel tests.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Фиксирую образ и завершаю container.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Почему container started не равно database ready?",
+          "short_answer": "Процесс ещё может инициализировать БД.",
+          "detailed_answer": "Дождитесь готовности порта или логического условия и подтвердите соединение. Только затем применяйте migrations; timeout должен дать понятную ошибку запуска.",
+          "pitfalls": "Не лечить readiness увеличением sleep.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Как ускорить suite без потери изоляции?",
+              "expected_answer": "Можно разделить один container на отдельные databases или schemas и применять migrations предсказуемо; сравнить стоимость с риском общего состояния.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Когда rollback не изолирует integration test?",
+          "short_answer": "Когда проверяемый код использует другое соединение или transaction.",
+          "detailed_answer": "Тестовый BEGIN не распространяется на запросы pool автоматически. Нужна передача transaction или отдельная schema/database с надёжным cleanup.",
+          "pitfalls": "Не обещать изоляцию, если код самостоятельно делает commit.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Почему важно применять настоящие migrations?",
+          "short_answer": "Ручной test schema может отличаться от production.",
+          "detailed_answer": "Отсутствие constraint или неверный тип колонки останется незамеченным. Миграции должны создавать окружение, а test fixtures только наполнять минимальные сценарии.",
+          "pitfalls": "Не поддерживать отдельную упрощённую схему в тестах.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Что делать при отсутствии Docker в CI?",
+          "short_answer": "Настроить runtime для обязательного integration job.",
+          "detailed_answer": "Если job заявляет проверку БД, молчаливый skip оставляет ложную уверенность. Отдельный локальный быстрый suite допустим, но coverage каждого этапа должно быть явным.",
+          "pitfalls": "Не считать skipped integration suite успешно проверенным.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Testcontainers for Go",
+          "url": "https://golang.testcontainers.org/",
+          "resource_type": "documentation",
+          "source_name": "Testcontainers project",
+          "sort_order": 10
+        },
+        {
+          "title": "Postgres module",
+          "url": "https://golang.testcontainers.org/modules/postgres/",
+          "resource_type": "documentation",
+          "source_name": "Testcontainers project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Проверить adapter на БД",
+          "description": "Поднимите фиксированный PostgreSQL container, примените migrations и проверьте unique conflict и rollback двухшаговой операции. Организуйте cleanup при падении.",
+          "expected_outcome": "Suite воспроизводится на чистом runtime и не оставляет контейнеров или общих данных.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "testing-race-fuzz",
+      "title": "Race detector и fuzzing",
+      "summary": "Находить наблюдаемые гонки и неожиданные входы без ложного обещания полной корректности.",
+      "difficulty": "intermediate",
+      "sort_order": 50,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "testing-table-subtests"
+      ],
+      "sections": [
+        {
+          "heading": "Динамический поиск гонок",
+          "body_markdown": "go test -race инструментирует обращения к памяти и обнаруживает несинхронизированные конфликтующие доступы в выполненных путях. Он не доказывает отсутствие всех гонок: редкая ветка должна исполниться. Отсутствие data race также не означает логическую атомарность — два синхронизированных шага могут потерять бизнес-инвариант. Тесты конкуренции должны запускать реалистичный доступ, а исправление выбирает ownership, mutex, atomic или channel согласно требуемой гарантии.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Fuzz target и свойства",
+          "body_markdown": "Fuzzing генерирует входы на основе seed corpus и ищет нарушения свойства или panic. Для parser полезны свойства: не падать на любом input, round-trip сохраняет значение для валидных данных, некорректный input даёт ограниченную ошибку. Проверка только отсутствия panic недостаточна для правильности результата. Fuzz target должен быть быстрым и независимым от сети, времени и shared mutable state; объём входа ограничивают, если это часть реального контракта.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Воспроизводимость находки",
+          "body_markdown": "Обнаруженный failing input сохраняется как regression case и запускается обычным go test. Минимизация помогает понять, какое правило нарушено. Не исправляйте проблему удалением corpus или skip, если input допустим по контракту. Race detector добавляет расходы, поэтому его результаты не используют для оценки production latency. Fuzz budget задают отдельно в CI, а corpus и обычные тесты остаются быстрым обязательным барьером.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Запускаю race на конкурентных путях.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Отличаю data race от логической ошибки.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Формулирую свойства fuzz target.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Сохраняю failing input как regression.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Доказывает ли успешный -race отсутствие гонок?",
+          "short_answer": "Нет, проверены только выполненные пути.",
+          "detailed_answer": "Инструмент наблюдает реальное исполнение. Увеличивайте содержательную конкурентную нагрузку и проверяйте ownership, но не заменяйте рассуждение о синхронизации одним зелёным запуском.",
+          "pitfalls": "Не считать race detector формальным доказательством.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Почему fuzzing с внешним HTTP нестабилен?",
+              "expected_answer": "Результат зависит от сети и remote state, а не только входа; внешнюю границу заменяют детерминированным adapter или тестируют отдельно.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Может ли код без data race терять обновления?",
+          "short_answer": "Да, если составная операция не атомарна.",
+          "detailed_answer": "Отдельные lock для Read и Write защищают память, но между ними другой клиент меняет значение. Инвариант требует общей критической секции или атомарной операции.",
+          "pitfalls": "Не путать memory safety и корректность сценария.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Какое свойство проверить у encoder/decoder?",
+          "short_answer": "Round-trip для валидных значений.",
+          "detailed_answer": "Decode(Encode(x)) должен сохранять оговорённую семантику x, включая допустимые нормализации. Для произвольных bytes отдельно проверяют отсутствие panic и корректное ограничение ошибок.",
+          "pitfalls": "Не требовать равенства представлений, если формат нормализуется.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Что делать с найденным fuzz input?",
+          "short_answer": "Сохранить воспроизводимый regression и исправить причину.",
+          "detailed_answer": "Минимальный input превращают в понятный сценарий, затем подтверждают fail до fix и pass после. Budget fuzzing можно увеличивать, но corpus не удаляют ради зелёного CI.",
+          "pitfalls": "Не объявлять input невозможным без проверки контракта.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Data Race Detector",
+          "url": "https://go.dev/doc/articles/race_detector",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Go fuzzing",
+          "url": "https://go.dev/doc/security/fuzz/",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Найти два класса ошибок",
+          "description": "Для конкурентного счётчика воспроизведите data race, затем исправьте синхронизацию. Для parser добавьте fuzz target с round-trip и malformed input.",
+          "expected_outcome": "Race suite проходит выполненные сценарии; найденные inputs воспроизводятся обычными regression tests.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "testing-benchmarks-pyramid",
+      "title": "Benchmarks, allocations и тестовая пирамида",
+      "summary": "Измерять репрезентативную работу и выбирать набор тестов по риску и стоимости обратной связи.",
+      "difficulty": "intermediate",
+      "sort_order": 60,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "testing-table-subtests",
+        "go-arrays-slices"
+      ],
+      "sections": [
+        {
+          "heading": "Benchmark должен отвечать вопросу",
+          "body_markdown": "Benchmark сравнивает конкретную операцию на фиксированных данных. Setup, случайная генерация и внешняя сеть могут доминировать измерение и скрыть алгоритм. Используйте testing.B, для современного кода рассмотрите b.Loop согласно документации вашей версии Go. ReportAllocs или -benchmem показывает allocations, но меньше allocations не гарантирует меньшую latency. Убедитесь, что результат вычисления реально используется и workload похож на приложение.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Шум и сравнение",
+          "body_markdown": "Один запуск на загруженном ноутбуке не доказывает ускорение. Повторяйте сравнимые измерения на одной конфигурации, фиксируйте версии и размер входа, анализируйте распределение результатов, например benchstat. Microbenchmark не включает contention, GC под полной нагрузкой и сеть, если их нет в сценарии. Не переносите проценты ускорения маленькой функции на весь endpoint; profile и end-to-end latency показывают, является ли эта функция значимой частью стоимости.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Пирамида как бюджет доказательств",
+          "body_markdown": "Много быстрых unit tests полезны для правил, integration tests — для SQL и adapters, несколько end-to-end flows — для критической сборки системы. Форма пирамиды не требует жёсткого процента каждого вида. Выбирайте тест по ошибке, которую он способен поймать, и времени диагностики. Coverage показывает выполненные строки, а не качество assertions. Не заменяйте тест транзакции сотней mock expectations или все правила медленным браузерным сценарием.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Отделяю setup от измерения.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Измеряю allocations и время отдельно.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Сравниваю повторные запуски.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Выбираю test level по риску ошибки.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Почему benchmark стал быстрее после удаления результата?",
+          "short_answer": "Компилятор мог устранить ненужную работу.",
+          "detailed_answer": "Проверяйте корректный шаблон benchmark и использование результата. b.Loop предоставляет специальные гарантии, но окружающий setup и workload всё равно нужно проектировать осмысленно.",
+          "pitfalls": "Не измерять операцию, которую программа не обязана выполнить.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Как проверить цену allocations в endpoint?",
+              "expected_answer": "Сначала профиль на реалистичной нагрузке, затем benchmark выделенной операции; подтвердить влияние на endpoint после изменения.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Можно ли доказать ускорение одним ns/op?",
+          "short_answer": "Нет, нужен контроль шума и повторение.",
+          "detailed_answer": "Сравните серии на одинаковом окружении и input, используйте статистическое сравнение. При небольшом отличии естественная вариативность может быть больше эффекта.",
+          "pitfalls": "Не выдавать случайный лучший запуск за гарантированную скорость.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Почему 100% coverage недостаточно?",
+          "short_answer": "Assertions могут не проверять существенное поведение.",
+          "detailed_answer": "Тест проходит строку, но может игнорировать результат, ошибку или эффект. Нужны сценарии границ и инвариантов, а покрытие служит указателем непроверенных путей.",
+          "pitfalls": "Не оптимизировать процент вместо уверенности.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Когда нужен end-to-end test?",
+          "short_answer": "Когда риск находится в соединении нескольких реальных частей.",
+          "detailed_answer": "Login, cookie и доступ к приватной странице зависят от routing, proxy и frontend state. Чистое правило перехода статуса дешевле и точнее проверять unit test.",
+          "pitfalls": "Не закреплять произвольное соотношение видов тестов.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "testing benchmarks",
+          "url": "https://pkg.go.dev/testing#hdr-Benchmarks",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "benchstat",
+          "url": "https://pkg.go.dev/golang.org/x/perf/cmd/benchstat",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Сравнить алгоритмы",
+          "description": "Напишите benchmarks поиска по slice и map на нескольких размерах с одинаковой подготовкой. Запустите повторения с -benchmem и сравните benchstat; объясните место unit/integration/E2E тестов этого модуля.",
+          "expected_outcome": "Вывод ограничен измеренным workload, а выбор тестов связан с конкретными рисками.",
+          "sort_order": 10
+        }
+      ]
+    }
+  ]
+}

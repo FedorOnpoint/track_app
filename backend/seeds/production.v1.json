@@ -1,0 +1,720 @@
+{
+  "version": 1,
+  "category": {
+    "slug": "production",
+    "title": "Production",
+    "description": "Наблюдаемость, управляемый lifecycle и расследование сбоев Go сервисов.",
+    "sort_order": 100
+  },
+  "topics": [
+    {
+      "slug": "production-structured-logging",
+      "title": "Структурированные логи и безопасная корреляция",
+      "summary": "Проектировать события slog, связывать запросы и исключать секреты из диагностических данных.",
+      "difficulty": "intermediate",
+      "sort_order": 10,
+      "estimated_minutes": 45,
+      "prerequisites": [
+        "go-errors-panic-recover"
+      ],
+      "sections": [
+        {
+          "heading": "Событие как контракт",
+          "body_markdown": "Структурированный лог состоит из сообщения, уровня и именованных атрибутов. В `slog` JSONHandler упрощает машинный поиск, но полезность определяется схемой: `operation`, `request_id`, `duration_ms`, безопасный код ошибки. Названия полей и единицы должны оставаться стабильными. Error используют для значимого сбоя операции, а ожидаемый отказ валидации не превращают в аварийный шум. Логируйте на границе ответственности, чтобы один сбой не создавал цепочку одинаковых записей.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Контекст и корреляция",
+          "body_markdown": "Логгер с постоянными атрибутами можно получить через With и передать зависимости явно. Вызов InfoContext передаёт context обработчику, но сам по себе не извлекает request_id или trace_id: эту связь настраивает приложение или handler. Входящий идентификатор проверяют по длине и формату либо создают свой. Для фоновой задачи полезен job_id и связь с исходным событием; повторная попытка получает номер, позволяющий отличить новый запрос от retry.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Стоимость и конфиденциальность",
+          "body_markdown": "Пароли, cookie, токены и пользовательские заметки не должны попадать в события даже на debug. Предпочитайте разрешённый набор атрибутов вместо удаления отдельных известных секретов. Объём логов ограничивают уровнями, sampling повторяющихся событий и сроком хранения. Ошибка записи лога требует наблюдаемого решения: бесконечное ожидание медленного sink может остановить API. При расследовании проверяют полноту и временной диапазон, а отсутствие записи не считают доказательством отсутствия операции.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Задаю стабильные поля и единицы события.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Различаю передачу context и автоматическое извлечение атрибутов.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Исключаю credentials и содержимое заметок из логов.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Оцениваю шум, retention и поведение медленного sink.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Почему InfoContext(ctx, ...) не гарантирует trace_id в JSON?",
+          "short_answer": "Context доступен handler, но поля нужно добавить явно.",
+          "detailed_answer": "Стандартный handler не знает соглашения приложения о ключах context. Связь создают middleware, With или специализированный handler; это проверяют на реальном событии.",
+          "pitfalls": "Считать context универсальным хранилищем автоматически сериализуемых полей.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Где добавить request_id для всех записей запроса?",
+              "expected_answer": "Создать проверенный ID в middleware и передать логгер с With либо настроить handler, извлекающий его из типизированного context.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "В пяти слоях возвращается одна ошибка БД. Где её логировать?",
+          "short_answer": "Обычно один раз на границе завершения операции.",
+          "detailed_answer": "Нижние слои добавляют контекст к error, верхний слой знает результат для пользователя и уровень события. Отдельное событие retry допустимо, если оно описывает другое действие.",
+          "pitfalls": "Дублировать stack и error на каждом return.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Можно ли логировать весь HTTP request для расследования?",
+          "short_answer": "Нужно заранее отобрать безопасные метаданные.",
+          "detailed_answer": "URL query и заголовки могут содержать токены, body — личные данные. Записывают маршрут-шаблон, статус, длительность и проверенный ID; диагностическое расширение ограничивают по времени и доступу.",
+          "pitfalls": "Считать debug окружение разрешением раскрывать секреты.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "После debug-режима latency выросла. Что проверить?",
+          "short_answer": "Объём, сериализацию и блокировку вывода.",
+          "detailed_answer": "Профиль и измерения покажут форматирование значений или медленный writer. Уменьшают поток событий и дорогие вычисления, задают явную политику буфера и потери логов.",
+          "pitfalls": "Без измерения заменять библиотеку логирования.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "log/slog",
+          "url": "https://pkg.go.dev/log/slog",
+          "source_name": "Go project",
+          "resource_type": "documentation",
+          "sort_order": 10
+        },
+        {
+          "title": "Monitoring Distributed Systems",
+          "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+          "source_name": "Google SRE",
+          "resource_type": "documentation",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Схема событий для API",
+          "description": "Добавьте slog к небольшому API: success, invalid input и ошибка зависимости. Отправьте запрос с фиктивным токеном и проверьте JSON, затем замедлите writer.",
+          "expected_outcome": "Логи коррелируются по request_id, секрет отсутствует, стоимость вывода измерена.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "production-metrics",
+      "title": "Метрики, гистограммы и cardinality",
+      "summary": "Выбирать сигналы состояния API, корректно агрегировать latency и ограничивать число временных рядов.",
+      "difficulty": "intermediate",
+      "sort_order": 20,
+      "estimated_minutes": 45,
+      "prerequisites": [
+        "go-types-zero-values"
+      ],
+      "sections": [
+        {
+          "heading": "Что измерять",
+          "body_markdown": "Для API начните с частоты запросов, ошибок, длительности и насыщения ресурсов. Counter подходит для накопительного количества событий; gauge описывает текущее число активных операций; histogram распределяет наблюдения по buckets. Измерение успешных и ошибочных ответов раздельно помогает не принять быстрые отказы за улучшение latency. Метрика очереди или ожидания соединения часто объясняет рост времени лучше, чем средняя загрузка CPU.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Распределение и агрегирование",
+          "body_markdown": "Среднее скрывает медленный хвост: у двух сервисов одинаковая средняя latency может сочетаться с разным p99. Границы histogram buckets выбирают вокруг целевого времени ответа и ожидаемого диапазона. Для классических Prometheus histograms сначала агрегируют скорости bucket counters с сохранением `le`, затем вычисляют quantile. Нельзя усреднять p99 отдельных экземпляров: такое число не является p99 общего потока запросов.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Размерность и практические ограничения",
+          "body_markdown": "Каждая комбинация labels создаёт ряд. Используйте ограниченные значения: метод, маршрут-шаблон, класс ответа; user_id, полный URL и request_id резко увеличивают cardinality. Даже ограниченные labels перемножаются, поэтому оцените число комбинаций до публикации. Метрики показывают тренд и симптом, но не заменяют конкретный лог или trace. При рестарте counter сбрасывается: для скорости используют подходящие функции, учитывающие reset, и наблюдают достаточный интервал.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Выбираю counter, gauge и histogram по смыслу.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Отдельно измеряю успешные и ошибочные запросы.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Объясняю, почему нельзя усреднять p99.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Оцениваю произведение label cardinalities.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Почему label path=/users/123 опасен?",
+          "short_answer": "Число рядов растёт с числом пользователей.",
+          "detailed_answer": "Используйте /users/{id}; конкретный ID переносится в безопасный лог или trace. Высокая cardinality расходует память и усложняет запросы мониторинга.",
+          "pitfalls": "Думать, что короткая строка label всегда дешева.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Чем заменить request_id в метрике?",
+              "expected_answer": "Оставить ограниченные labels; конкретный trace можно связать через exemplars при поддержке инструмента.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "У двух реплик p99 равен 100 и 900 мс. Общий p99 — 500 мс?",
+          "short_answer": "Нет, нужны исходные распределения и веса.",
+          "detailed_answer": "Квантили не складываются линейно. Агрегируют histogram buckets всех реплик за одинаковое окно и оценивают quantile общего распределения.",
+          "pitfalls": "Усреднять percentiles или игнорировать число запросов.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Error rate упал вместе с трафиком до нуля. Сервис здоров?",
+          "short_answer": "Нужно проверить доступность снаружи.",
+          "detailed_answer": "Запросы могли перестать доходить до процесса. Black-box probe, балансировщик и denominator отличают отсутствие нагрузки от успешного обслуживания.",
+          "pitfalls": "Считать отсутствие событий успехом.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Как выбрать buckets для SLO 300 мс?",
+          "short_answer": "Включить границу 300 мс и покрыть соседние диапазоны.",
+          "detailed_answer": "Bucket на пороге позволяет считать долю запросов, уложившихся в цель. Плотность остальных границ влияет на точность quantile и стоимость рядов.",
+          "pitfalls": "Полагаться на defaults без проверки диапазона.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Instrumentation",
+          "url": "https://prometheus.io/docs/practices/instrumentation/",
+          "source_name": "Prometheus",
+          "resource_type": "documentation",
+          "sort_order": 10
+        },
+        {
+          "title": "Monitoring Distributed Systems",
+          "url": "https://sre.google/sre-book/monitoring-distributed-systems/",
+          "source_name": "Google SRE",
+          "resource_type": "documentation",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Измерить API под смешанной нагрузкой",
+          "description": "Опишите counter по результатам, histogram времени и gauge активных запросов. Смешайте быстрые ответы, медленные ответы и ошибки, сравните mean с p95.",
+          "expected_outcome": "Получено распределение и обоснованы labels; число рядов оценено до запуска.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "production-distributed-tracing",
+      "title": "Tracing и границы причинности",
+      "summary": "Читать spans распределённого запроса, передавать trace context и понимать ограничения sampling.",
+      "difficulty": "intermediate",
+      "sort_order": 30,
+      "estimated_minutes": 45,
+      "prerequisites": [
+        "go-functions-defer"
+      ],
+      "sections": [
+        {
+          "heading": "Запрос как дерево операций",
+          "body_markdown": "Trace объединяет spans, каждый из которых описывает ограниченную операцию: HTTP handler, вызов SQL или внешний запрос. Span содержит время, атрибуты, статус и отношения с другими spans. Детализация должна отвечать на диагностический вопрос: span на каждую короткую функцию создаёт объём без пользы. Родительский span удобно завершать через defer, но статус ошибки и события записывают по фактическому результату операции, не по самому факту возврата.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Передача и асинхронность",
+          "body_markdown": "Между сервисами передают trace context стандартным propagator через HTTP headers, извлекая его на принимающей стороне. Внутри Go context связывает операции и cancellation, однако создание span не добавляет дедлайн автоматически. Для сообщения в очереди решение о parent или link зависит от жизни операции и повторных доставок. Baggage пересекает границы сервисов, поэтому в него нельзя класть секреты или неконтролируемо большие пользовательские значения.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Sampling и интерпретация",
+          "body_markdown": "Sampling ограничивает стоимость: head sampling решает в начале, tail sampling может учитывать итог trace, но требует инфраструктуры и буферизации. Отсутствие trace не доказывает, что запрос не выполнялся. Параллельные spans могут перекрываться; сумму их длительностей нельзя считать общей latency. Для сравнения времён разных машин учитывают clock skew. Tracing дополняет метрики конкретной историей, а trace_id в безопасном логе облегчает переход к ней.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Различаю span, trace и parent/link.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Передаю trace context через propagator.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Не смешиваю tracing с дедлайнами context.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Учитываю sampling, параллельность и clock skew.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "HTTP trace обрывается при вызове соседнего сервиса. Почему?",
+          "short_answer": "Проверьте инъекцию и извлечение context.",
+          "detailed_answer": "Создать span на клиенте недостаточно: транспорт должен inject заголовки, сервер — extract и создать span с полученным контекстом. Дополнительно проверяют совместимость propagators.",
+          "pitfalls": "Искать проблему только в UI tracing.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Можно ли доверять входящему baggage?",
+              "expected_answer": "Нет: ограничивают размер, допустимые поля и использование, исключают секреты и решения авторизации.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Два параллельных SQL spans по 80 мс. Handler длится 90 мс. Это ошибка?",
+          "short_answer": "Нет, операции могут перекрываться.",
+          "detailed_answer": "Trace показывает временные интервалы, а не последовательный список расходов. Критический путь учитывает overlap и ожидание; сумма всех spans может быть больше длительности handler.",
+          "pitfalls": "Складывать все длительности для поиска overhead.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Почему редкий timeout не виден при head sampling 1%?",
+          "short_answer": "Запрос мог быть отброшен до появления ошибки.",
+          "detailed_answer": "Начальное решение не знает результата. Рассматривают tail sampling, выделенные правила или связь с логами; при этом оценивают стоимость хранения и неполные traces.",
+          "pitfalls": "Считать отсутствие trace доказательством отсутствия timeout.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Span SQL завершён успешно, но API вернул 500. Что смотреть?",
+          "short_answer": "Другие операции и границы формирования ответа.",
+          "detailed_answer": "Успех запроса БД не гарантирует успешную сериализацию или внешний вызов. Ищут событие ошибки, статус root span, логи по trace_id и участок без инструментирования.",
+          "pitfalls": "Приписывать весь запрос последнему видимому span.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Traces",
+          "url": "https://opentelemetry.io/docs/concepts/signals/traces/",
+          "source_name": "OpenTelemetry",
+          "resource_type": "documentation",
+          "sort_order": 10
+        },
+        {
+          "title": "Context propagation",
+          "url": "https://opentelemetry.io/docs/concepts/context-propagation/",
+          "source_name": "OpenTelemetry",
+          "resource_type": "documentation",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Связать две HTTP операции",
+          "description": "Инструментируйте учебные client и server, передайте контекст и вызовите две параллельные зависимости. Повторите с отключённой propagation.",
+          "expected_outcome": "На trace видны parent relations, overlap и конкретное место разрыва.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "production-health-shutdown",
+      "title": "Liveness, readiness и graceful shutdown",
+      "summary": "Останавливать Go HTTP сервис с ограниченным drain и отделять жизнь процесса от готовности принимать трафик.",
+      "difficulty": "intermediate",
+      "sort_order": 40,
+      "estimated_minutes": 45,
+      "prerequisites": [
+        "go-functions-defer",
+        "go-errors-panic-recover"
+      ],
+      "sections": [
+        {
+          "heading": "Два разных вопроса здоровья",
+          "body_markdown": "Liveness сообщает, может ли процесс продолжать работу, readiness — способен ли он сейчас обслуживать нужный трафик. Временная ошибка общей БД не обязательно повод перезапускать все API: это может усилить outage. Проверки должны быть дешёвыми, иметь короткий deadline и не раскрывать конфигурацию. Readiness зависит от обязательных компонентов и состояния lifecycle; опциональная аналитика не должна автоматически выключать основной путь пользователя.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Порядок завершения",
+          "body_markdown": "При SIGTERM процесс переводят в draining: readiness становится false, балансировщику дают перестать направлять новые запросы, затем запускают `Server.Shutdown` с отдельным ограниченным context. Shutdown закрывает listeners и idle connections, ожидает активные HTTP соединения. Context, уже отменённый сигналом, не подходит для этого ожидания. Возврат ErrServerClosed из Serve при штатном завершении не считают аварией. Пул БД закрывают после зависимых запросов.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Работа за границей HTTP",
+          "body_markdown": "Shutdown не дожидается hijacked connections, например WebSocket, и не управляет произвольными фоновыми workers. Для них нужен собственный протокол: прекратить приём работы, завершить или отменить задачи, дождаться bounded ожидания. Main должен оставаться жив до конца drain. Дедлайн завершения выбирают меньше внешнего grace period; если время истекло, применяют предусмотренное принудительное закрытие и фиксируют, какая работа могла остаться незавершённой.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Разделяю причины liveness и readiness.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Создаю независимый timeout context для drain.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Дожидаюсь Shutdown до выхода main.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Управляю workers и hijacked connections отдельно.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "БД недоступна 10 секунд. Нужно ли падать по liveness?",
+          "short_answer": "Обычно нет, если процесс работоспособен.",
+          "detailed_answer": "Readiness может отражать обязательную зависимость, а liveness — локальную неисправность. Массовые рестарты не чинят БД и добавляют нагрузку при восстановлении.",
+          "pitfalls": "Делать одинаковые dependency probes для всех проверок.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Как проверить probe без перегрузки БД?",
+              "expected_answer": "Ограничить deadline и частоту, выбрать дешёвую проверку, при необходимости кратко переиспользовать результат.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Почему Shutdown(signalContext) вернулся сразу после SIGTERM?",
+          "short_answer": "Signal context уже отменён.",
+          "detailed_answer": "Создают новый context с timeout для drain и вызывают Shutdown, затем ждут результат. Родитель lifecycle и бюджет завершения имеют разные задачи.",
+          "pitfalls": "Использовать отменённый request context для cleanup.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Shutdown успешен, но worker ещё пишет в БД. Можно закрыть pool?",
+          "short_answer": "Сначала нужно остановить и дождаться worker.",
+          "detailed_answer": "HTTP lifecycle не охватывает фоновые goroutines. Прекращают приём задач, задают cancel или drain и ждут их завершения в пределах общего бюджета.",
+          "pitfalls": "Считать Shutdown глобальным join всех goroutines.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Почему WebSocket пережил Shutdown?",
+          "short_answer": "Hijacked connection обслуживается отдельно.",
+          "detailed_answer": "Нужен registry соединений или shutdown callback, уведомление клиента и контролируемое закрытие. Callback сам по себе не гарантирует, что Shutdown дождётся асинхронной работы.",
+          "pitfalls": "Считать все соединения обычными HTTP requests.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Server.Shutdown",
+          "url": "https://pkg.go.dev/net/http#Server.Shutdown",
+          "source_name": "Go project",
+          "resource_type": "documentation",
+          "sort_order": 10
+        },
+        {
+          "title": "Managing Incidents",
+          "url": "https://sre.google/sre-book/managing-incidents/",
+          "source_name": "Google SRE",
+          "resource_type": "documentation",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Проверить завершение под нагрузкой",
+          "description": "Создайте медленный HTTP handler и фоновую задачу. Во время выполнения отправьте SIGTERM, проверьте readiness, завершение ответа и порядок закрытия pool.",
+          "expected_outcome": "Процесс выходит в пределах бюджета без преждевременного прекращения main.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "production-pprof",
+      "title": "pprof и диагностика production регрессии",
+      "summary": "Выбирать CPU, heap и goroutine профили по гипотезе и проверять эффект оптимизации.",
+      "difficulty": "intermediate",
+      "sort_order": 50,
+      "estimated_minutes": 45,
+      "prerequisites": [
+        "go-arrays-slices"
+      ],
+      "sections": [
+        {
+          "heading": "От симптома к измерению",
+          "body_markdown": "Профилирование начинают с наблюдаемого симптома: CPU вырос, память удерживается, latency растёт при низком CPU. CPU profile показывает выборки выполняющегося кода за интервал, но ожидание сети в него почти не попадает. Goroutine profile помогает увидеть места ожидания и накопление задач. Важны нагрузка, длительность и версия приложения: профиль idle процесса нельзя напрямую сравнить с профилем пикового трафика.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Память и удержание",
+          "body_markdown": "Heap profile позволяет изучить живую память и накопленные allocations в разных представлениях. `inuse_space` отвечает на вопрос о удержании, `alloc_space` — об объёме аллокаций за жизнь процесса. Большой временный поток объектов увеличивает давление GC даже при небольшом живом heap. Срез маленькой части большого буфера может удерживать исходный массив; профиль даёт направление, а владение объектом проверяют по коду и контролируемому воспроизведению.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Безопасный сбор и проверка",
+          "body_markdown": "pprof endpoints раскрывают внутреннее устройство процесса и не должны быть публичной частью API. Используют отдельный административный listener, сетевые ограничения и ограниченное окно сбора. Block и mutex profiles требуют подходящих настроек и имеют overhead. После изменения повторяют сопоставимую нагрузку и измеряют пользовательские latency, CPU и память: красивый локальный benchmark не гарантирует устранения production bottleneck. Иногда узкое место находится в БД, а не в Go.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Сопоставляю профиль с CPU, памятью или ожиданием.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Различаю inuse_space и alloc_space.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Ограничиваю доступ и стоимость профилирования.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Проверяю гипотезу на сопоставимой нагрузке.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Latency выросла, CPU низкий. Достаточно ли CPU profile?",
+          "short_answer": "Нет, нужно исследовать ожидание.",
+          "detailed_answer": "Проверяют goroutine stacks, блокировки, очереди, пул БД и внешнюю latency. CPU sampling отвечает только на вопрос, где тратилось процессорное время.",
+          "pitfalls": "Объявлять функцию с largest CPU sample причиной любой задержки.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Что покажут тысячи goroutines на получении соединения?",
+              "expected_answer": "Вероятное насыщение pool или удержание соединений; надо проверить длительность запросов и границы освобождения.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "alloc_space большой, inuse_space маленький. Есть утечка?",
+          "short_answer": "Это может быть churn без устойчивого удержания.",
+          "detailed_answer": "Поток временных allocations увеличивает работу GC. Утечку подтверждают ростом живых объектов во времени и причинами удержания, а не одной суммой выделенной памяти.",
+          "pitfalls": "Приравнивать общий объём allocations к размеру heap.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Почему доступный из интернета /debug/pprof опасен?",
+          "short_answer": "Раскрывает internals и позволяет дорогой сбор.",
+          "detailed_answer": "Профили могут содержать чувствительные детали работы; длительные запросы создают overhead. Отделяют административный endpoint и контролируют авторизацию и сеть.",
+          "pitfalls": "Считать диагностический endpoint безопасным, потому что он read-only.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "После замены JSON encoder benchmark быстрее. Можно объявить проблему решённой?",
+          "short_answer": "Нужно измерить исходный production сценарий.",
+          "detailed_answer": "Encoder мог занимать малую долю критического пути. Повторяют нагрузку, сравнивают p95/p99 и ресурсы, проверяют корректность ответа и не смещён ли bottleneck.",
+          "pitfalls": "Подменять end-to-end результат микробенчмарком.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Diagnostics",
+          "url": "https://go.dev/doc/diagnostics",
+          "source_name": "Go project",
+          "resource_type": "documentation",
+          "sort_order": 10
+        },
+        {
+          "title": "net/http/pprof",
+          "url": "https://pkg.go.dev/net/http/pprof",
+          "source_name": "Go project",
+          "resource_type": "documentation",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Расследовать удержание буфера",
+          "description": "Напишите учебный пример хранения короткого subslice большого буфера и вариант с копированием. Снимите heap profiles после одинаковой серии операций.",
+          "expected_outcome": "Разница inuse_space связана с временем жизни backing array и подтверждена кодом.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "production-slo-incidents",
+      "title": "SLI/SLO, error budget и основы incident response",
+      "summary": "Определять качество сервиса с позиции пользователя и связывать инцидент с измеримым воздействием.",
+      "difficulty": "intermediate",
+      "sort_order": 60,
+      "estimated_minutes": 45,
+      "prerequisites": [
+        "go-errors-panic-recover"
+      ],
+      "sections": [
+        {
+          "heading": "Показатель и цель",
+          "body_markdown": "SLI измеряет аспект качества, SLO задаёт допустимую цель и окно. Для API это может быть доля успешных валидных запросов или доля ответов быстрее 300 мс. Нужно явно определить numerator, denominator, источник данных и исключения; иначе изменение фильтра улучшит цифру без улучшения опыта. SLA — внешнее соглашение с последствиями нарушения, оно не является синонимом внутренней цели. Несколько важных пользовательских путей могут требовать разных индикаторов.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Бюджет и действие",
+          "body_markdown": "Error budget — допустимая доля плохих событий в выбранном окне. Например, для 99.9% успеха среди миллиона запросов бюджет составляет тысячу неуспешных запросов; это request-based расчёт, его нельзя безоговорочно переводить в минуты. Burn rate сравнивает фактическую скорость ошибок с допустимой. Alert должен сообщать о влиянии и требовать понятного действия; короткое и длинное окна помогают отличить краткий всплеск от устойчивой траты бюджета.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Восстановление и обучение",
+          "body_markdown": "Во время incident сначала уточняют impact и безопасно уменьшают ущерб: rollback, ограничение нагрузки, отключение необязательного пути. Назначают координацию, ведут timeline и сообщают текущее состояние без неподтверждённых причин. После восстановления изучают способ обнаружения, действия и системные условия. Blameless postmortem не отменяет ответственности за follow-up: у действия должны быть владелец, срок и проверяемый результат, иначе знание не меняет надёжность.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Задаю формулу SLI и окно SLO.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Считаю request-based budget без смешения с временем.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Выбираю alert по impact и burn rate.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Разделяю mitigation, diagnosis и postmortem actions.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "SLO 99.9% на миллион запросов. Каков error budget?",
+          "short_answer": "Тысяча плохих запросов по выбранному SLI.",
+          "detailed_answer": "Разрешённая доля 0.001 умножается на denominator. Если SLI исключает invalid requests, число зависит от принятого определения, которое фиксируют до оценки.",
+          "pitfalls": "Автоматически переводить request budget в 43 минуты.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Что меняется при неравномерном трафике?",
+              "expected_answer": "Одинаковая длительность outage расходует разное число запросов; временной SLI и request-based SLI дают разные оценки.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "CPU 95%, но SLI хорош. Нужно ли немедленно будить on-call?",
+          "short_answer": "Не обязательно: оцените насыщение и риск.",
+          "detailed_answer": "CPU — диагностический сигнал. Paging привязывают к пользовательскому impact или близкому доказуемому исчерпанию ресурса; capacity trend может стать отдельной плановой задачей.",
+          "pitfalls": "Считать любое высокое использование аварией.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "После релиза выросли 500. Что сделать до поиска root cause?",
+          "short_answer": "Определить impact и рассмотреть безопасный rollback.",
+          "detailed_answer": "Проверяют совместимость отката и текущие изменения данных, сохраняют evidence. Восстановление сервиса и глубокая диагностика могут идти разными ролями.",
+          "pitfalls": "Продолжать экспериментировать на всех пользователях без mitigation.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Postmortem завершился действием «быть внимательнее». Почему этого мало?",
+          "short_answer": "Результат нельзя надёжно проверить.",
+          "detailed_answer": "Нужны системные меры: gate, автоматическая проверка, улучшение alert или runbook. Для каждой задают владельца и критерий, предотвращающий конкретный failure mode.",
+          "pitfalls": "Заменять улучшение процесса поиском виноватого.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Service Level Objectives",
+          "url": "https://sre.google/sre-book/service-level-objectives/",
+          "source_name": "Google SRE",
+          "resource_type": "documentation",
+          "sort_order": 10
+        },
+        {
+          "title": "Alerting on SLOs",
+          "url": "https://sre.google/workbook/alerting-on-slos/",
+          "source_name": "Google SRE",
+          "resource_type": "documentation",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Спроектировать SLO для чтения заметок",
+          "description": "Определите good event, окно и исключения, рассчитайте budget на трёх объёмах трафика. Для роста 500 составьте первые действия и проверяемое улучшение обнаружения.",
+          "expected_outcome": "Формулы однозначны, alert связан с impact, mitigation отделён от гипотезы причины.",
+          "sort_order": 10
+        }
+      ]
+    }
+  ]
+}

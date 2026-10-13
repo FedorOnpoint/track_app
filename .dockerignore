@@ -1,0 +1,14 @@
+.git
+.worktrees
+.superpowers
+.env
+.env.*
+**/node_modules
+**/dist
+**/coverage
+**/test-results
+**/playwright-report
+**/*.tsbuildinfo
+.tools
+.backups
+**/__pycache__

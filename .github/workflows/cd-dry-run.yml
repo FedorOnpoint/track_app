@@ -1,0 +1,24 @@
+name: CD dry-run only
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  release-plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Validate immutable images and release gates without SSH or registry writes
+        env:
+          REPOSITORY: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          repository=$(printf '%s' "$REPOSITORY" | tr '[:upper:]' '[:lower:]')
+          export API_IMAGE="ghcr.io/${repository}-api:${COMMIT_SHA}"
+          export WEB_IMAGE="ghcr.io/${repository}-web:${COMMIT_SHA}"
+          make cd-dry-run
+      - name: Exercise migration and application rollback tests
+        run: python3 -m unittest discover -s deploy -p 'test_*.py'

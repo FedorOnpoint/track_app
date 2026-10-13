@@ -1,0 +1,81 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Backend quality and catalog
+        run: |
+          test -z "$(gofmt -l backend)"
+          cd backend
+          go vet ./...
+          go test -race -tags=integration ./...
+          go run ./cmd/check-seed -catalog seeds/*.v1.json
+      - name: Pinned static analysis and query generation
+        run: |
+          make tools staticcheck generate-check workflow-check
+          python3 -m unittest discover -s deploy -p 'test_*.py'
+          cd backend && ../.tools/govulncheck ./...
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22.22.0'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Frontend quality and accessibility
+        working-directory: frontend
+        run: |
+          npm ci --ignore-scripts
+          npm run typecheck
+          npm run lint
+          npm test
+          npm run build
+          npm audit --audit-level=high
+          npx playwright install --with-deps chromium
+          npm run test:browser
+  containers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '22.22.0'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Images, real API flow and restart
+        run: |
+          make docker-build
+          cd frontend
+          npm ci --ignore-scripts
+          npx playwright install --with-deps chromium
+          cd ..
+          python3 deploy/operations.py local-smoke --e2e
+      - name: Container vulnerabilities
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.75.0 image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 track-app-api:local
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.75.0 image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 track-app-web:local

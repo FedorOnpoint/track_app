@@ -1,0 +1,721 @@
+{
+  "version": 1,
+  "category": {
+    "slug": "architecture",
+    "title": "Архитектура",
+    "description": "Границы модулей, направленные зависимости, сборка приложения и прагматичный выбор архитектурных паттернов.",
+    "sort_order": 70
+  },
+  "topics": [
+    {
+      "slug": "architecture-cohesion-coupling",
+      "title": "Cohesion, coupling и границы packages",
+      "summary": "Разделять код по причинам изменения и контролировать зависимости между частями приложения.",
+      "difficulty": "intermediate",
+      "sort_order": 10,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "go-packages-modules"
+      ],
+      "sections": [
+        {
+          "heading": "Общая причина изменения",
+          "body_markdown": "Cohesion показывает, насколько элементы модуля служат общей задаче. Package progress может содержать переходы статуса, checklist и вычисление состояния темы: эти правила меняются вместе. Package helpers с SQL, HTTP и форматированием объединён только удобством хранения и скрывает разные причины изменения. Количество файлов или строк не определяет хорошую границу. Сначала назовите ответственность и данные, которыми модуль владеет, затем проверяйте связность операций внутри него.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Зависимость имеет несколько форм",
+          "body_markdown": "Coupling возникает не только через import. Два модуля могут читать одну таблицу, ожидать конкретный порядок вызовов или обмениваться строками с неявным форматом. Изменение детали хранения тогда распространяется на соседей даже при маленьком Go-интерфейсе. Явный контракт должен описывать семантику: отсутствие объекта, ошибки, cancellation, владение коллекцией. Циклические imports запрещены в Go и часто показывают смешанную ответственность, которую нельзя исправить одним переносом типов в общий utils.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Проверка границы на изменении",
+          "body_markdown": "Представьте добавление нового статуса прогресса. Если требуется менять обработчик, бизнес-правило и хранение одного модуля, это ожидаемая работа; если затронуты несвязанные auth и notes, ищите утечку контрактов. Уменьшение coupling не требует интерфейса для каждой функции. Можно оставить конкретную внутреннюю структуру и экспортировать узкую операцию. Цена абстракции оправдана, когда она скрывает реальную изменчивость или обеспечивает самостоятельное тестирование правила.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Называю причину изменения package.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Замечаю coupling через таблицы и порядок вызовов.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Устраняю import cycle изменением границы.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Обосновываю размер экспортируемого API.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Почему пакет utils часто становится проблемой?",
+          "short_answer": "Он объединяет несвязанные ответственности.",
+          "detailed_answer": "У общего имени нет предметного ограничения: туда попадают операции разных модулей, затем появляется широкий граф зависимостей. Перенесите функцию к владельцу правила или выделите конкретную техническую способность с ясным API.",
+          "pitfalls": "Не переименовывать utils в common без изменения структуры.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Как проверить cohesion при ревью?",
+              "expected_answer": "Перечислить ответственности и посмотреть, какие операции используют одни данные и меняются при одном бизнес-требовании.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Означает ли отсутствие import низкий coupling?",
+          "short_answer": "Нет, зависимость может идти через данные или протокол.",
+          "detailed_answer": "Прямое чтение чужой таблицы привязывает модуль к схеме. Неявный порядок вызовов тоже является контрактом; изменение одной стороны нарушит другую без предупреждения компилятора.",
+          "pitfalls": "Не оценивать архитектуру только по графу imports.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Как решить цикл между notes и catalog?",
+          "short_answer": "Уточнить владельца операции и направление зависимости.",
+          "detailed_answer": "Возможно, notes достаточно идентификатора темы и проверки существования через узкий контракт. Если правило принадлежит orchestration, вынесите координацию туда вместо взаимных imports.",
+          "pitfalls": "Не вводить глобальный registry ради обхода компилятора.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Нужно ли дробить большой package?",
+          "short_answer": "Если появились независимые причины изменения или скрытые границы.",
+          "detailed_answer": "Размер — сигнал для анализа, а не критерий. Разделение общего инварианта по нескольким пакетам может увеличить coupling; проверяйте реальные сценарии изменения и читаемость API.",
+          "pitfalls": "Не вводить лимит строк как доказательство качества.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Organizing a Go module",
+          "url": "https://go.dev/doc/modules/layout",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Effective Go: names",
+          "url": "https://go.dev/doc/effective_go#names",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Перерисовать границы",
+          "description": "Разберите package с обработчиками login, SQL notes и форматированием дат. Назовите владельцев правил и предложите imports после разделения.",
+          "expected_outcome": "Для каждой экспортируемой операции указана ответственность; циклических зависимостей нет.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "architecture-dependency-inversion",
+      "title": "Dependency inversion и интерфейсы потребителя",
+      "summary": "Направлять зависимости к потребностям бизнес-операции, а не к деталям адаптера.",
+      "difficulty": "intermediate",
+      "sort_order": 20,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "architecture-cohesion-coupling",
+        "interfaces"
+      ],
+      "sections": [
+        {
+          "heading": "Контракт от потребителя",
+          "body_markdown": "Сервису изменения прогресса нужна операция сохранить состояние, а не весь API SQL-драйвера. Небольшой интерфейс объявляют рядом с кодом, который его использует; PostgreSQL-адаптер реализует его неявно. Так правило зависит от необходимого поведения, а деталь хранения подстраивается под контракт. Dependency inversion относится к направлению исходных зависимостей: runtime-вызов всё равно идёт от сервиса к базе через переданный объект.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Семантика важнее сигнатуры",
+          "body_markdown": "Save(ctx, progress) error недостаточно без ответа, что происходит при конфликте версии или неизвестной теме. Доменные ошибки не должны требовать импорта pgx в бизнес-package. Адаптер классифицирует SQLSTATE и преобразует его в договорённый результат, сохраняя cause для внутренних логов. Контракт не обязан скрывать любую техническую деталь: deadline и отсутствие результата — реальные условия операции, которые нельзя вычеркнуть ради красивой схемы слоёв.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Меньше контрактов, больше смысла",
+          "body_markdown": "Не создавайте интерфейс со всеми методами реализации заранее. Один потребитель чтения может иметь Reader, другой — Updater, даже если один адаптер удовлетворяет обоим. Интерфейс с единственной неизменяемой реализацией может быть полезен для границы тестирования, но иногда обычная функция или конкретный тип проще. Проверяйте, не заставляет ли порт утекать SQL Rows или HTTP Response: это признаки зависимости от механики адаптера, а не от задачи.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Размещаю интерфейс рядом с потребителем.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Разделяю source dependency и runtime call.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Определяю ошибки и cancellation контракта.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Не экспортирую детали SQL через порт.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Где объявить интерфейс хранилища прогресса?",
+          "short_answer": "В package потребителя бизнес-операции.",
+          "detailed_answer": "Потребитель определяет необходимый набор методов. Реализация в другом package удовлетворяет ему неявно и может меняться без изменения правила, если сохраняет семантику.",
+          "pitfalls": "Не генерировать интерфейс копированием всех методов адаптера.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Что делать с ошибкой unique violation?",
+              "expected_answer": "Адаптер переводит конкретный код БД в контрактный конфликт, а бизнес-код решает ожидаемый сценарий без зависимости от SQLSTATE.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Нарушает ли вызов PostgreSQL из сервиса inversion?",
+          "short_answer": "Не сам runtime-вызов, а зависимость от детали.",
+          "detailed_answer": "Сервис вызывает переданный порт, не импортируя драйвер. Конкретный адаптер выбирает composition root; source dependencies идут к контракту потребителя.",
+          "pitfalls": "Не путать направление вызова с направлением imports.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Почему вернуть pgx.Rows из repository неудобно?",
+          "short_answer": "Потребитель вынужден знать драйвер и lifecycle результата.",
+          "detailed_answer": "Он должен закрывать Rows, сканировать поля и обрабатывать ошибки итерации. Если цель порта — доменные данные, адаптер завершает чтение и возвращает предметное значение или явный stream-контракт.",
+          "pitfalls": "Не прятать имя драйвера, оставляя его поведение наружу.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Нужен ли интерфейс только ради mock?",
+          "short_answer": "Иногда, если он выражает полезную границу.",
+          "detailed_answer": "Для одной чистой функции mock не нужен. Узкий порт полезен, когда правило отделено от внешнего эффекта; тест не должен диктовать бессмысленный универсальный слой.",
+          "pitfalls": "Не считать количество interfaces показателем качества.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Effective Go: interfaces",
+          "url": "https://go.dev/doc/effective_go#interfaces_and_types",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Go specification: interface types",
+          "url": "https://go.dev/ref/spec#Interface_types",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Выделить порт",
+          "description": "Уберите импорт драйвера из сервиса смены статуса. Задайте небольшой порт с конфликтом и отсутствием темы, реализуйте in-memory и SQL-адаптеры.",
+          "expected_outcome": "Бизнес-правило тестируется без драйвера; обе реализации соблюдают один контракт.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "architecture-di-composition",
+      "title": "Dependency injection и composition root",
+      "summary": "Собирать зависимости явно и управлять их lifecycle в точке запуска.",
+      "difficulty": "intermediate",
+      "sort_order": 30,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "architecture-dependency-inversion"
+      ],
+      "sections": [
+        {
+          "heading": "Передать зависимость явно",
+          "body_markdown": "Dependency injection означает, что объект получает нужную способность извне: через constructor, аргумент функции или поле с ограниченным доступом. Для HTTP-сервиса можно передать repository, clock и logger при создании. Это делает зависимости видимыми и позволяет тесту выбрать fake clock без изменения глобального time.Now. DI не требует container framework, reflection или service locator; обычные функции Go часто дают проверку связности на этапе компиляции.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Composition root и ошибки запуска",
+          "body_markdown": "В main собирают конфигурацию, соединение с БД, adapters, services и router. Каждый constructor получает только нужные значения, а не общую карту сервисов. Ошибки обязательной конфигурации и открытия ресурсов обнаруживаются до обслуживания запросов. Если constructor создаёт ресурс, должен быть ясен владелец Close; альтернативой является создание ресурса в main и передача готового объекта. Порядок остановки обычно обратен зависимости: прекратить входящий трафик, завершить работу, закрыть storage.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Тестируемость без скрытых глобальных данных",
+          "body_markdown": "Service locator скрывает необходимость зависимости до момента runtime-вызова Get. Глобальные объекты осложняют параллельные тесты и создают неявный порядок инициализации. Для случайности, времени и внешних эффектов достаточно узкого явно переданного контракта. Не инъектируйте каждую арифметическую функцию: лишние параметры ухудшают понятность. Конкретная immutable-конфигурация может передаваться как значение; разделяйте параметры алгоритма и долгоживущие ресурсы.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Передаю зависимости явно.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Собираю приложение в main.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Назначаю владельца Close.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Избегаю service locator и mutable globals.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Чем constructor injection лучше глобальной БД?",
+          "short_answer": "Зависимость видима и заменяема при создании.",
+          "detailed_answer": "Каждый экземпляр сервиса имеет определённое хранилище и тест может использовать своё. Глобальная переменная связывает все экземпляры и тесты с общим lifecycle и скрытой инициализацией.",
+          "pitfalls": "Не подменять global переменную в параллельных тестах.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Как протестировать TTL без sleep?",
+              "expected_answer": "Передать clock как функцию или небольшой интерфейс, управлять временем в тесте и проверять точную границу истечения.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Где создавать pool и router?",
+          "short_answer": "В composition root приложения.",
+          "detailed_answer": "main проверяет конфигурацию, открывает pool, собирает adapters и services, регистрирует handlers и управляет shutdown. Бизнес-package не должен сам искать credentials и запускать сервер.",
+          "pitfalls": "Не отдавать каждой бизнес-операции чтение env.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Кто должен закрывать переданный pool?",
+          "short_answer": "Владелец lifecycle, обычно composition root.",
+          "detailed_answer": "Сервис, получивший общий pool, не закрывает его после отдельного запроса. Владение ресурсом фиксируется контрактом constructor и последовательностью shutdown.",
+          "pitfalls": "Не смешивать использование ресурса и владение им.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Нужен ли DI framework для небольшого Go-сервиса?",
+          "short_answer": "Обычно достаточно явных constructors.",
+          "detailed_answer": "Компилятор проверяет типы параметров, а main показывает граф зависимостей. Framework может оправдаться сложностью сборки, но добавляет механизм и диагностику, которые нужно поддерживать.",
+          "pitfalls": "Не вводить reflection container ради модного термина.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Effective Go: initialization",
+          "url": "https://go.dev/doc/effective_go#initialization",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Go database connection management",
+          "url": "https://go.dev/doc/database/manage-connections",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Собрать приложение явно",
+          "description": "Создайте constructors для session service и handler, передайте store и clock. В main соберите реальную реализацию, в тесте — fake clock.",
+          "expected_outcome": "Бизнес-package не читает env и не создаёт globals; ресурс закрывается одним владельцем.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "architecture-repository-transactions",
+      "title": "Repository pattern и граница транзакции",
+      "summary": "Выражать операции хранения без потери атомарности бизнес-сценария.",
+      "difficulty": "intermediate",
+      "sort_order": 40,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "architecture-dependency-inversion"
+      ],
+      "sections": [
+        {
+          "heading": "Repository не универсальная таблица",
+          "body_markdown": "Repository предоставляет операции, нужные предметному сценарию: FindSession, SaveProgress, ListReviewTopics. Generic CRUD со свободной картой фильтров быстро превращается в второй query language, а сервис всё равно должен знать структуру таблиц. Иногда прямой типизированный SQL в небольшом модуле проще repository. Польза pattern — понятный контракт хранения и изоляция его механики, а не запрет SQL в любом коде по догме.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Атомарность определяется сценарием",
+          "body_markdown": "Смена пароля и отзыв сессий должны фиксироваться вместе. Если каждый repository открывает свою транзакцию, эти операции могут завершиться частично. Граница transaction располагается вокруг бизнес-сценария; adapter или unit-of-work передаёт согласованный набор операций, использующий один tx. Не передавайте tx как any и не храните текущую transaction в global. Контекст запроса переносит cancellation, но не является универсальным скрытым контейнером DB-зависимостей.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Чтение и контракт ошибок",
+          "body_markdown": "Repository может вернуть список карточек, а не полностью восстановленный aggregate, если задача — read model. Ограничьте размер результата, определите сортировку и семантику отсутствия. Для записи отличайте not found, conflict и техническую недоступность, не заставляя сервис разбирать текст сообщения драйвера. Тесты in-memory реализации проверяют бизнес-сценарий, но не доказывают SQL, constraints и isolation: для них нужен integration test с реальной PostgreSQL.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Выбираю методы из сценариев.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Держу атомарность вокруг use case.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Не создаю скрытый global tx.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Отдельно проверяю SQL и доменное правило.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Почему два repository с собственным Begin не дают общую атомарность?",
+          "short_answer": "Они создают независимые transactions.",
+          "detailed_answer": "Commit первого уже видим, даже если второй rollback. Координатор сценария должен выполнять оба изменения через один transaction boundary и согласованные adapters.",
+          "pitfalls": "Не считать одинаковый request context одной транзакцией.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Как выразить optimistic update?",
+              "expected_answer": "Операция принимает ожидаемую версию, обновляет при её совпадении и возвращает явный conflict при изменённом состоянии.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Нужно ли возвращать aggregate для каждого списка?",
+          "short_answer": "Нет, допустима отдельная read model.",
+          "detailed_answer": "Для dashboard достаточно полей выдачи и агрегатов. Полная загрузка графа данных увеличивает стоимость и coupling; read model должна иметь явный контракт сортировки и ограничений.",
+          "pitfalls": "Не загружать все связи ради симметрии методов.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Почему GenericRepository[T] не всегда помогает?",
+          "short_answer": "Разные сущности имеют разные инварианты и запросы.",
+          "detailed_answer": "CRUD-методы плохо выражают условное обновление, блокировку и сложные отчёты. Generic контейнер может уменьшить повторение, но не заменяет предметную семантику операции.",
+          "pitfalls": "Не добавлять карту произвольных SQL-предикатов в бизнес-API.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Достаточен ли fake repository для теста транзакции?",
+          "short_answer": "Нет, он не воспроизводит поведение PostgreSQL.",
+          "detailed_answer": "Fake полезен для ветвления бизнес-кода, но ошибки SQL, constraints, visibility и rollback нужно проверить интеграционно. Контрактные тесты уменьшают расхождение реализаций.",
+          "pitfalls": "Не считать отсутствие ошибок fake доказательством корректного SQL.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Executing transactions",
+          "url": "https://go.dev/doc/database/execute-transactions",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Querying for data",
+          "url": "https://go.dev/doc/database/querying",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Согласовать две записи",
+          "description": "Реализуйте смену пароля и отзыв сессий одним use case. Внесите ошибку во вторую запись и проверьте rollback первой в PostgreSQL.",
+          "expected_outcome": "Частично выполненное состояние отсутствует; бизнес-код не знает concrete SQL transaction.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "architecture-modular-monolith",
+      "title": "Modular monolith и владение данными",
+      "summary": "Сохранять предметные границы в одном процессе и осознанно выбирать коммуникацию.",
+      "difficulty": "intermediate",
+      "sort_order": 50,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "architecture-cohesion-coupling"
+      ],
+      "sections": [
+        {
+          "heading": "Модуль как владелец возможностей",
+          "body_markdown": "Modular monolith развёртывается как одно приложение, но содержит предметные модули с собственными правилами и явными API. Auth владеет sessions, notes — текстом заметок, catalog — системными темами. Факт одного PostgreSQL не означает свободный доступ каждого package ко всем таблицам. Граница обеспечивает локальность изменения, а общий процесс позволяет обычные вызовы и одну транзакцию без сетевого протокола там, где это нужно сценарию.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Общий отчёт и orchestration",
+          "body_markdown": "Dashboard собирает сведения нескольких модулей. Можно координировать их публичные read-операции или сделать отдельную явно согласованную read model. Важно обозначить зависимость отчёта от данных, а не внедрять взаимные calls между auth, notes и progress. Domain event внутри процесса тоже требует определённой семантики доставки: синхронный callback может сорвать transaction, а асинхронная goroutine потеряет работу при остановке. Очередь не появляется автоматически от названия event.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Trade-off против распределения",
+          "body_markdown": "Один deployment упрощает отладку и совместимые изменения, но требует согласованного release и изоляции ресурсоёмких задач. Выделение сервиса добавляет network failures, повторную доставку, наблюдаемость и договорённость о consistency. До разделения измерьте независимый workload, ответственность команды и требуемый lifecycle. Чёткая модульная граница помогает будущему выделению, однако не делает миграцию бесплатной: общие transactions и shared schema придётся пересмотреть.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Называю владельца таблиц и операций.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Собираю dashboard через явный контракт.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Определяю семантику внутренних events.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Обосновываю выделение сервиса реальной потребностью.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Чем modular monolith отличается от большого монолита без границ?",
+          "short_answer": "Явным владением правилами и контрактами модулей.",
+          "detailed_answer": "Одна единица deployment совместима с независимыми предметными packages. Ограниченные imports и доступ к данным сохраняют локальность изменения, хотя runtime остаётся общим.",
+          "pitfalls": "Не считать набор каталогов доказательством модульности.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Что мешает простому выделению auth?",
+              "expected_answer": "Общие transactions, прямое чтение sessions соседями и shared schema превращаются в распределённые контракты, которые требуют новой consistency-модели.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Можно ли dashboard читать все таблицы?",
+          "short_answer": "Можно через явную read model с зафиксированной ответственностью.",
+          "detailed_answer": "Это осознанная зависимость отчёта от схемы. Случайные запросы в каждом модуле размывают владение; альтернативой служат публичные read API, если стоимость и consistency подходят.",
+          "pitfalls": "Не требовать сетевого API внутри одного процесса.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Гарантирует ли goroutine доставку domain event?",
+          "short_answer": "Нет, работа может потеряться при остановке.",
+          "detailed_answer": "Нужно определить надёжность. Для обязательного эффекта фиксируют событие вместе с данными и организуют повторяемую доставку; для необязательной аналитики допустим иной контракт.",
+          "pitfalls": "Не путать асинхронность с durable queue.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Когда выделять модуль в сервис?",
+          "short_answer": "При оправданной независимости масштабирования или lifecycle.",
+          "detailed_answer": "Сравните выгоду с сетью, частичными отказами и операционной стоимостью. Если главная проблема — запутанные зависимости, сначала исправьте границы в монолите.",
+          "pitfalls": "Не объявлять microservices признаком уровня Middle.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Organizing a Go module",
+          "url": "https://go.dev/doc/modules/layout",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Go internal directories",
+          "url": "https://pkg.go.dev/cmd/go#hdr-Internal_Directories",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Разделить предметные модули",
+          "description": "Для catalog, progress, notes и auth укажите владельца данных и публичные операции. Реализуйте dashboard без циклических imports.",
+          "expected_outcome": "Граф dependencies направлен, а общие отчёты имеют явного координатора.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "architecture-hexagonal-tradeoffs",
+      "title": "Clean и hexagonal architecture без догматизма",
+      "summary": "Отделять полезные порты от церемоний и удерживать правила независимо от HTTP и SQL.",
+      "difficulty": "intermediate",
+      "sort_order": 60,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "architecture-dependency-inversion",
+        "architecture-di-composition"
+      ],
+      "sections": [
+        {
+          "heading": "Порты и adapters",
+          "body_markdown": "Hexagonal architecture описывает взаимодействие приложения с внешним миром через порты. HTTP handler преобразует запрос в вход операции, а PostgreSQL adapter реализует исходящий контракт хранения. Центр содержит правило, например допустимый переход статуса, а не net/http ResponseWriter. Clean architecture также подчёркивает направление dependencies к более стабильной политике. Эти подходы помогают рассуждать о границах, но не требуют одинакового числа каталогов в каждом проекте.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Перевод на границах",
+          "body_markdown": "HTTP DTO содержит формат wire: строки, optional поля, JSON names. Доменные значения содержат валидное состояние, а SQL row отражает хранение. Иногда простая структура безопасно используется сразу в нескольких ролях; разделение нужно при разных lifecycle, validation или формате. Не копируйте каждую структуру в четыре слоя без различия контрактов. Преобразование ошибок тоже находится на границе: доменный conflict становится HTTP 409, техническая причина сохраняется для диагностики.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Цена абстракции и путь изменения",
+          "body_markdown": "Слой с методом, который только пересылает аргументы следующему слою, добавляет навигацию без нового правила. Для маленького CRUD-модуля прямой service с типизированным store может быть достаточно чистым. Для сложной политики независимые domain operations помогают тестировать без сервера. Проверяйте подход конкретным изменением: добавление CLI или другого storage должно переиспользовать нужное правило, а не вынуждать имитировать HTTP. Простота измеряется ясностью сценария и границ, не количеством паттернов.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Разделяю правило и transport mechanics.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Перевожу данные и ошибки на границах.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Не дублирую DTO без причины.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Оцениваю архитектуру сценарием изменения.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Может ли domain service принимать ResponseWriter?",
+          "short_answer": "Это связывает правило с HTTP transport.",
+          "detailed_answer": "Вход правила лучше выразить предметной командой, а результат — данными и контрактной ошибкой. Handler решает status и JSON; CLI использует тот же use case без HTTP-объектов.",
+          "pitfalls": "Не прятать ResponseWriter внутри собственного универсального интерфейса.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Что меняется при добавлении CLI?",
+              "expected_answer": "Добавляется входящий adapter, вызывающий тот же use case; HTTP parsing и response mapping остаются в HTTP adapter.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Всегда ли нужны отдельные DTO, entity и model?",
+          "short_answer": "Нет, если их контракты действительно совпадают.",
+          "detailed_answer": "Разделяйте типы при различии формата, валидности или lifecycle. Лишние копии увеличивают стоимость изменений; общая структура становится проблемой, когда SQL-nullability или JSON-теги диктуют доменное правило.",
+          "pitfalls": "Не применять число слоёв как универсальную норму.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Где превратить конфликт в HTTP 409?",
+          "short_answer": "В transport adapter.",
+          "detailed_answer": "Бизнес-код возвращает контрактный conflict независимо от протокола. HTTP handler отображает его на status; другой вход может использовать иной способ сообщения той же причины.",
+          "pitfalls": "Не возвращать status codes из чистой бизнес-операции.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Как обнаружить бесполезный слой?",
+          "short_answer": "Проверить, какое правило или границу он удерживает.",
+          "detailed_answer": "Постоянная передача одинаковых аргументов без policy, adaptation или ownership часто означает лишнюю прослойку. Удаление должно сохранять семантику и возможность нужного тестирования.",
+          "pitfalls": "Не удалять адаптер только потому, что он короткий.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Effective Go: interfaces",
+          "url": "https://go.dev/doc/effective_go#interfaces_and_types",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Go HTTP package",
+          "url": "https://pkg.go.dev/net/http",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Добавить второй вход",
+          "description": "Реализуйте переход статуса через use case, HTTP adapter и небольшую CLI-команду. Приведите validation и ошибки к одному правилу.",
+          "expected_outcome": "Оба входа переиспользуют бизнес-операцию, а HTTP-типы остаются в adapter.",
+          "sort_order": 10
+        }
+      ]
+    }
+  ]
+}

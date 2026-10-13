@@ -24,6 +24,7 @@ export function TopicNotes({ slug }: { slug: string }) {
   const [editBody, setEditBody] = useState('')
   const [confirmID, setConfirmID] = useState<string | null>(null)
   const confirmButton = useRef<HTMLButtonElement>(null)
+  const deleteTrigger = useRef<HTMLButtonElement | null>(null)
   const notes = useQuery({
     queryKey: notesKey,
     queryFn: async ({ signal }) => (await apiRequest<ApiEnvelope<Note[]>>('/notes', { signal })).data,
@@ -81,6 +82,11 @@ export function TopicNotes({ slug }: { slug: string }) {
     if (body && !updateMutation.isPending) updateMutation.mutate({ id, body })
   }
 
+  function cancelDelete() {
+    setConfirmID(null)
+    deleteTrigger.current?.focus()
+  }
+
   const topicNotes = (notes.data ?? []).filter((note) => note.topic_slug === slug)
   return <section id="notes" className="topic-notes" aria-labelledby="notes-heading">
     <p className="eyebrow">Личный конспект</p><h2 id="notes-heading">Заметки</h2>
@@ -92,8 +98,8 @@ export function TopicNotes({ slug }: { slug: string }) {
     <ul className="note-list">{topicNotes.map((note) => <li key={note.id}>
       {editingID === note.id
         ? <form className="note-form" onSubmit={(event) => updateNote(event, note.id)}><label htmlFor={`note-${note.id}`}>Текст заметки</label><textarea id={`note-${note.id}`} value={editBody} maxLength={20_000} onChange={(event) => setEditBody(event.target.value)} required /><div><button type="submit" disabled={updateMutation.isPending}>Сохранить</button><button type="button" onClick={() => setEditingID(null)}>Отмена</button></div></form>
-        : <><SafeMarkdown>{note.body_markdown}</SafeMarkdown><div className="note-actions"><button type="button" onClick={() => { setEditingID(note.id); setEditBody(note.body_markdown) }}>Редактировать</button><button type="button" onClick={() => setConfirmID(note.id)}>Удалить</button></div></>}
-      {confirmID === note.id && <div className="delete-confirm" role="alertdialog" aria-labelledby={`delete-title-${note.id}`} onKeyDown={(event) => { if (event.key === 'Escape') setConfirmID(null) }}><strong id={`delete-title-${note.id}`}>Удалить заметку?</strong><span>Это действие нельзя отменить.</span><div><button ref={confirmButton} type="button" onClick={() => deleteMutation.mutate(note.id)}>Да, удалить</button><button type="button" onClick={() => setConfirmID(null)}>Отмена</button></div></div>}
+        : <><SafeMarkdown>{note.body_markdown}</SafeMarkdown><div className="note-actions"><button type="button" onClick={() => { setEditingID(note.id); setEditBody(note.body_markdown) }}>Редактировать</button><button type="button" onClick={(event) => { deleteTrigger.current = event.currentTarget; setConfirmID(note.id) }}>Удалить</button></div></>}
+      {confirmID === note.id && <div className="delete-confirm" role="alertdialog" aria-labelledby={`delete-title-${note.id}`} onKeyDown={(event) => { if (event.key === 'Escape') cancelDelete() }}><strong id={`delete-title-${note.id}`}>Удалить заметку?</strong><span>Это действие нельзя отменить.</span><div><button ref={confirmButton} type="button" onClick={() => deleteMutation.mutate(note.id)}>Да, удалить</button><button type="button" onClick={cancelDelete}>Отмена</button></div></div>}
     </li>)}</ul>
   </section>
 }

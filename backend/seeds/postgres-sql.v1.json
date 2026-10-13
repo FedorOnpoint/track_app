@@ -1,0 +1,717 @@
+{
+  "version": 1,
+  "category": {
+    "slug": "postgres-sql",
+    "title": "PostgreSQL и SQL",
+    "description": "Реляционное моделирование, запросы, планы, транзакции, соединения и эволюция схемы.",
+    "sort_order": 60
+  },
+  "topics": [
+    {
+      "slug": "sql-modeling-constraints",
+      "title": "Реляционная модель и ограничения",
+      "summary": "Проектировать ключи, связи и инварианты данных с учётом NULL и конкурентных записей.",
+      "difficulty": "intermediate",
+      "sort_order": 10,
+      "estimated_minutes": 40,
+      "prerequisites": [],
+      "sections": [
+        {
+          "heading": "Ключи и связи",
+          "body_markdown": "Таблица описывает один вид фактов. Primary key идентифицирует строку и исключает NULL, а foreign key связывает существование дочерней записи с родительской. Например, прогресс пользователя ссылается на пользователя и тему, а UNIQUE(user_id, topic_id) запрещает два состояния одной пары. Искусственный идентификатор удобен для ссылок, но не заменяет бизнес-уникальность: её следует выражать отдельным ограничением.",
+          "sort_order": 10
+        },
+        {
+          "heading": "NULL и проверка инвариантов",
+          "body_markdown": "NULL означает отсутствие известного значения и участвует в трёхзначной логике. Сравнение через = NULL не проверяет отсутствие: используйте IS NULL. CHECK отклоняет false, но не unknown, поэтому обязательное поле требует NOT NULL отдельно. По умолчанию UNIQUE допускает несколько NULL; если бизнес считает такие значения одинаковыми, рассмотрите NULLS NOT DISTINCT. Не переносите правила SQL в Go без явного преобразования nullable значения.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Нормализация и стоимость изменения",
+          "body_markdown": "Хранение названия категории в каждой теме создаёт аномалию обновления: часть строк может сохранить старое имя. Вынос справочника обеспечивает единый источник факта, но добавляет join при чтении. Денормализация допустима для измеренного сценария с явной стратегией синхронизации. Проверка существования строки в приложении до INSERT не защищает от гонки; окончательное решение принимает ограничение БД, а код классифицирует ошибку без утечки SQL клиенту.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Различаю идентификатор и бизнес-уникальность.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Выражаю обязательность отдельно от CHECK.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Показываю трёхзначную логику NULL.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Обосновываю нормализацию инвариантами.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Почему SELECT перед INSERT не заменяет UNIQUE?",
+          "short_answer": "Между запросами другой клиент может вставить строку.",
+          "detailed_answer": "Два запроса одновременно видят отсутствие записи. Ограничение UNIQUE проверяется самой БД при записи и сохраняет правило при любом пути доступа. Приложение обрабатывает конфликт как ожидаемый результат.",
+          "pitfalls": "Не считать локальный mutex защитой от других процессов.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Можно ли добавить индекс на внешний ключ автоматически?",
+              "expected_answer": "PostgreSQL не создаёт индекс на ссылающихся колонках автоматически; необходимость оценивают по запросам и операциям над родителем.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Пропустит ли CHECK(age > 0) строку с age=NULL?",
+          "short_answer": "Да, если нет NOT NULL.",
+          "detailed_answer": "Результат выражения unknown не нарушает CHECK. Для обязательного возраста нужны и NOT NULL, и проверка диапазона; эти правила отвечают на разные вопросы.",
+          "pitfalls": "Не путать unknown с false.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Когда нужен составной ключ?",
+          "short_answer": "Когда факт однозначно определяется сочетанием полей.",
+          "detailed_answer": "В таблице связи пользователь–тема пара естественно уникальна. Можно выбрать её primary key либо добавить surrogate key и оставить UNIQUE пары для бизнес-правила.",
+          "pitfalls": "Не полагаться только на surrogate key.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Как выбрать ON DELETE для foreign key?",
+          "short_answer": "По lifecycle связанного факта.",
+          "detailed_answer": "CASCADE подходит для полностью принадлежащих родителю данных, RESTRICT/NO ACTION помогает обнаружить запрещённое удаление, SET NULL требует nullable связи и осмысленного состояния без родителя.",
+          "pitfalls": "Не ставить CASCADE на все связи без анализа.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "PostgreSQL: Constraints",
+          "url": "https://www.postgresql.org/docs/current/ddl-constraints.html",
+          "resource_type": "documentation",
+          "source_name": "PostgreSQL Global Development Group",
+          "sort_order": 10
+        },
+        {
+          "title": "PostgreSQL: Schemas",
+          "url": "https://www.postgresql.org/docs/current/ddl-schemas.html",
+          "resource_type": "documentation",
+          "source_name": "PostgreSQL Global Development Group",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Смоделировать прогресс",
+          "description": "Создайте users, topics и progress с ключами и ограничениями. Проверьте повторную пару, неизвестную тему, NULL и удаление родителя.",
+          "expected_outcome": "Ошибочные записи отклоняются БД; выбор каскадного удаления обоснован.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "sql-joins-cte",
+      "title": "JOIN, агрегация и CTE",
+      "summary": "Строить отчёты без потери строк и умножения агрегатов при соединениях.",
+      "difficulty": "intermediate",
+      "sort_order": 20,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "sql-modeling-constraints"
+      ],
+      "sections": [
+        {
+          "heading": "Кардинальность соединения",
+          "body_markdown": "JOIN объединяет строки, удовлетворяющие условию, а не склеивает таблицы один к одному. Если у пользователя три заметки и две закладки, независимое соединение обеих коллекций даёт шесть строк. COUNT или SUM после такого соединения может завысить результат. Сначала определите зерно результата: одна строка на пользователя, тему или событие. Для проверки существования обычно выразительнее EXISTS, не создающий дополнительные строки внешнего результата.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Внешнее соединение и фильтры",
+          "body_markdown": "LEFT JOIN сохраняет строки левой таблицы и заполняет отсутствующую правую часть NULL. Фильтр по правой таблице в WHERE может удалить эти строки и фактически изменить смысл отчёта. Условие отбора правых записей размещают в ON, если нужны и пользователи без совпадений. COUNT(*) считает сохранённую строку, COUNT(right.id) — только непустые идентификаторы. GROUP BY определяет уровень агрегации, HAVING фильтрует уже полученные группы.",
+          "sort_order": 20
+        },
+        {
+          "heading": "CTE как этап вычисления",
+          "body_markdown": "WITH позволяет назвать промежуточный запрос: например, отдельно посчитать заметки и закладки и затем соединить две агрегированные таблицы. CTE не является обещанием ускорения или обязательной временной таблицей. PostgreSQL может встроить подходящий CTE в основной запрос; MATERIALIZED и NOT MATERIALIZED влияют на план и повторное вычисление. Решение принимают после EXPLAIN, сохраняя смысл запроса. Рекурсивный CTE требует условия завершения и защиты от циклов в данных.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Определяю зерно результирующей строки.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Размещаю фильтр LEFT JOIN согласно смыслу.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Различаю COUNT(*) и COUNT(column).",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Не обещаю ускорение от WITH.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Почему счётчик заметок вырос после добавления JOIN закладок?",
+          "short_answer": "Соединение размножило строки заметок.",
+          "detailed_answer": "Две независимые связи один-ко-многим образуют комбинации совпадений. Агрегируйте каждую коллекцию до соединения или используйте отдельные коррелированные подзапросы, затем сравните планы.",
+          "pitfalls": "Не лечить любой случай DISTINCT без понимания зерна.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Как получить пользователя с нулём заметок?",
+              "expected_answer": "LEFT JOIN на предварительно агрегированные заметки и COALESCE счётчика либо COUNT непустого ключа после корректного соединения.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Чем WHERE right.active=true отличается от условия в ON?",
+          "short_answer": "WHERE отбрасывает строки без правого совпадения.",
+          "detailed_answer": "После LEFT JOIN у таких строк active равен NULL и предикат не true. Условие в ON ограничивает совпадения, оставляя строку левого объекта с NULL справа.",
+          "pitfalls": "Не считать эти варианты взаимозаменяемыми.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Когда EXISTS лучше JOIN?",
+          "short_answer": "Когда нужен факт наличия, а не поля каждой найденной строки.",
+          "detailed_answer": "EXISTS выражает полусоединение: внешний объект появляется независимо от количества подходящих дочерних строк. Конкретный алгоритм выбирает планировщик.",
+          "pitfalls": "Не обещать конкретное число чтений или ускорение.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Всегда ли CTE материализуется?",
+          "short_answer": "Нет, поведение зависит от запроса и настроек выражения.",
+          "detailed_answer": "Нерекурсивный CTE без побочных эффектов может быть встроен. Повторное использование и явные MATERIALIZED/NOT MATERIALIZED меняют возможности оптимизации. План нужно смотреть для реального запроса.",
+          "pitfalls": "Не переносить старые правила PostgreSQL на все версии.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "PostgreSQL: Table Expressions",
+          "url": "https://www.postgresql.org/docs/current/queries-table-expressions.html",
+          "resource_type": "documentation",
+          "source_name": "PostgreSQL Global Development Group",
+          "sort_order": 10
+        },
+        {
+          "title": "PostgreSQL: WITH Queries",
+          "url": "https://www.postgresql.org/docs/current/queries-with.html",
+          "resource_type": "documentation",
+          "source_name": "PostgreSQL Global Development Group",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Отчёт без умножения",
+          "description": "Создайте пользователя с тремя заметками и двумя закладками. Получите оба счётчика, включая пользователя без записей, сначала ошибочным JOIN, затем агрегацией в CTE.",
+          "expected_outcome": "Результат содержит 3 и 2, а пользователь без данных получает нули.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "sql-window-functions",
+      "title": "Window functions и порядок отчёта",
+      "summary": "Вычислять ранги и накопительные значения, сохраняя отдельные строки.",
+      "difficulty": "intermediate",
+      "sort_order": 30,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "sql-joins-cte"
+      ],
+      "sections": [
+        {
+          "heading": "Окно вместо свёртки",
+          "body_markdown": "GROUP BY сворачивает строки группы в одну, а оконная функция вычисляет значение для каждой исходной строки. OVER(PARTITION BY user_id) задаёт независимый расчёт по пользователям; ORDER BY внутри OVER определяет порядок вычисления, но не окончательную сортировку выдачи. Для рейтинга изученных тем можно вывести каждую тему и место пользователя, не теряя подробностей. Оконные функции работают после WHERE и обычной агрегации, поэтому фильтр по рангу выносят во внешний запрос.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Ранги и совпадения",
+          "body_markdown": "row_number присваивает разные номера строкам, rank оставляет разрывы после равных значений, dense_rank не оставляет разрывов. Если порядок по score не уникален, выбор строки с row_number=1 среди равных может меняться; добавьте стабильный tie-breaker, например id. lag и lead читают значение соседней строки внутри заданного порядка, что удобно для сравнения событий, но соседство определяется SQL-сортировкой, а не физическим расположением на диске.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Frame и накопительный итог",
+          "body_markdown": "Frame определяет часть partition, участвующую в расчёте. При ORDER BY стандартная рамка включает peers текущей строки, что может неожиданно изменить накопительный SUM и last_value. Для построчного накопления явно задайте ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW и полный порядок. Для last_value всей partition нужна рамка до UNBOUNDED FOLLOWING. Окно может потребовать сортировки большого набора; фильтрация исходных данных и подходящий план важнее короткого синтаксиса.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Различаю окно и GROUP BY.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Объясняю row_number, rank и dense_rank.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Задаю frame явно для накопления.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Добавляю tie-breaker и финальный ORDER BY.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Почему last_value вернул текущее значение?",
+          "short_answer": "Рамка закончилась на текущей группе равных строк.",
+          "detailed_answer": "last_value относится к frame, а не автоматически ко всей partition. Расширьте рамку до UNBOUNDED FOLLOWING, если требуется последнее значение всей группы, и задайте детерминированный порядок.",
+          "pitfalls": "Не путать partition и frame.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Когда ROWS и RANGE дают разные суммы?",
+              "expected_answer": "Когда есть равные ключи сортировки: RANGE учитывает peers, а ROWS работает с позициями строк в явно заданном порядке.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Чем rank отличается от dense_rank?",
+          "short_answer": "rank делает разрывы после равных мест.",
+          "detailed_answer": "При значениях 9,9,7 rank даёт 1,1,3, а dense_rank — 1,1,2. Выбор зависит от смысла рейтинга, row_number же даёт каждой строке собственный номер.",
+          "pitfalls": "Не использовать случайный номер как бизнес-рейтинг.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Можно ли написать WHERE row_number() OVER(...) <= 3?",
+          "short_answer": "Нет, вычисление окна происходит позже WHERE.",
+          "detailed_answer": "Вычислите rn в подзапросе или CTE и отфильтруйте во внешнем SELECT. Так выбор top-N применяется к уже вычисленным номерам каждой partition.",
+          "pitfalls": "Не переносить QUALIFY из другой СУБД в PostgreSQL.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Гарантирует ли ORDER BY в OVER порядок результата?",
+          "short_answer": "Нет, выдаче нужен отдельный ORDER BY.",
+          "detailed_answer": "Порядок внутри окна управляет ранжированием или lag. План выдачи может быть другим; контракт сортировки задаётся верхним SELECT и включает критерий разрешения равенства.",
+          "pitfalls": "Не полагаться на наблюдаемый порядок одного запуска.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "PostgreSQL: Window Functions",
+          "url": "https://www.postgresql.org/docs/current/tutorial-window.html",
+          "resource_type": "documentation",
+          "source_name": "PostgreSQL Global Development Group",
+          "sort_order": 10
+        },
+        {
+          "title": "PostgreSQL: Value Expressions",
+          "url": "https://www.postgresql.org/docs/current/sql-expressions.html",
+          "resource_type": "documentation",
+          "source_name": "PostgreSQL Global Development Group",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Построить рейтинг и сумму",
+          "description": "На событиях с повторяющимися датами сравните row_number, rank, dense_rank, SUM с RANGE и ROWS; выберите последние два события каждого пользователя.",
+          "expected_outcome": "Результаты объясняют равные ранги, рамку и стабильность выбора.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "sql-indexes-explain",
+      "title": "Индексы и EXPLAIN ANALYZE",
+      "summary": "Оценивать план по реальным кардинальностям и цене чтения и записи.",
+      "difficulty": "intermediate",
+      "sort_order": 40,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "sql-joins-cte"
+      ],
+      "sections": [
+        {
+          "heading": "Индекс соответствует предикату",
+          "body_markdown": "B-tree помогает с равенством, диапазонами и некоторыми сортировками. Для составного индекса порядок колонок связан с фильтрами и требуемым порядком выдачи; индекс(user_id, created_at, id) может поддерживать историю конкретного пользователя. Индекс не обязан использоваться: чтение большой доли таблицы последовательным проходом может быть дешевле. Partial index покрывает только строки своего предиката, который планировщик должен суметь сопоставить условию запроса.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Читать план сверху и снизу",
+          "body_markdown": "EXPLAIN показывает оценённый план, ANALYZE исполняет запрос и добавляет фактические строки и время. Сравнивайте estimates и actual rows, учитывайте loops: узел внутри nested loop выполняется многократно. BUFFERS помогает различить обращения к буферам и чтение, но сам по себе не измеряет пользовательскую задержку всей системы. Для изменяющего запроса ANALYZE реально меняет данные; запускайте его в контролируемом окружении, а не как безобидный просмотр.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Цена индекса и статистика",
+          "body_markdown": "Индексы занимают место и обслуживаются при записи. INCLUDE может помочь index-only scan, но видимость строк проверяется с учётом visibility map; наличие всех колонок в индексе не гарантирует отсутствие heap fetches. Ошибки оценки могут возникать из-за устаревшей статистики и корреляции колонок. Сначала проверьте распределение данных, ANALYZE и форму запроса; только затем меняйте индексы. Набор индексов оценивайте на чтении и записи при реалистичном объёме.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Связываю индекс с фильтром и сортировкой.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Сравниваю estimates, actual rows и loops.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Учитываю побочный эффект ANALYZE.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Оцениваю write amplification и размер.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Почему PostgreSQL выбрал Seq Scan при наличии индекса?",
+          "short_answer": "Оценил его дешевле для данного запроса.",
+          "detailed_answer": "Малая таблица или низкая селективность делает обход индекса с чтением heap дороже последовательного прохода. Устаревшая статистика также может исказить оценку; план нужно сравнить с фактическими данными.",
+          "pitfalls": "Не отключать seqscan как универсальное лечение.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Что делать при большой ошибке estimates?",
+              "expected_answer": "Проверить свежесть статистики, распределение и зависимость колонок; при необходимости рассмотреть extended statistics и повторно измерить план.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Что означает actual rows вместе с loops?",
+          "short_answer": "Показатель rows относится к одному выполнению узла.",
+          "detailed_answer": "При многократном внутреннем узле nested loop учитывайте число loops для масштаба работы. Высокая суммарная стоимость может скрываться за небольшим rows каждого выполнения.",
+          "pitfalls": "Не оценивать работу узла только по rows.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Опасен ли EXPLAIN ANALYZE DELETE?",
+          "short_answer": "Да, DELETE будет исполнен.",
+          "detailed_answer": "ANALYZE добавляет измерение фактического выполнения, а не симуляцию. Используйте тестовую БД; rollback не отменяет все возможные внешние эффекты вызываемых функций.",
+          "pitfalls": "Не запускать изменяющий запрос на production без анализа.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Гарантирует ли INCLUDE index-only scan без heap?",
+          "short_answer": "Нет, важна видимость версий строк.",
+          "detailed_answer": "План может выбрать index-only scan, но для страниц без отметки all-visible понадобится heap fetch. Частые изменения данных влияют на пользу покрытия; проверяйте план с BUFFERS.",
+          "pitfalls": "Не путать покрытие колонок с видимостью MVCC.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "PostgreSQL: Using EXPLAIN",
+          "url": "https://www.postgresql.org/docs/current/using-explain.html",
+          "resource_type": "documentation",
+          "source_name": "PostgreSQL Global Development Group",
+          "sort_order": 10
+        },
+        {
+          "title": "PostgreSQL: Indexes",
+          "url": "https://www.postgresql.org/docs/current/indexes.html",
+          "resource_type": "documentation",
+          "source_name": "PostgreSQL Global Development Group",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Обосновать индекс",
+          "description": "Наполните историю событий неравномерными данными и сравните EXPLAIN (ANALYZE, BUFFERS) запроса пользователя до и после составного индекса. Измерьте и вставки.",
+          "expected_outcome": "Выбор индекса объяснён предикатом, кардинальностью, сортировкой и ценой записи.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "sql-transactions-mvcc-locks",
+      "title": "Транзакции, MVCC, isolation и deadlocks",
+      "summary": "Сохранять инварианты при параллельных изменениях и корректно повторять транзакции.",
+      "difficulty": "intermediate",
+      "sort_order": 50,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "sql-modeling-constraints"
+      ],
+      "sections": [
+        {
+          "heading": "Атомарность и snapshot",
+          "body_markdown": "Транзакция связывает набор изменений в один commit или rollback. MVCC позволяет читать подходящие версии строк, не превращая каждое чтение в блокировку записи. В Read Committed каждый statement видит свой snapshot, поэтому два SELECT в одной транзакции могут получить разные данные. Repeatable Read сохраняет snapshot для транзакции, но не заменяет анализ бизнес-инварианта; Serializable обнаруживает несовместимые исполнения и может потребовать повтор всей транзакции.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Блокировки и потерянные решения",
+          "body_markdown": "Операция UPDATE count=count+1 выполняет изменение на стороне БД и избегает схемы прочитал–прибавил–записал в приложении. SELECT FOR UPDATE нужен, когда решение зависит от прочитанного состояния конкретных строк; блокировка держится до конца транзакции. Она не блокирует абстрактное отсутствие будущей строки. Для инварианта между несколькими строками рассмотрите ограничения, правильный уровень изоляции или явную сериализацию по общей строке-владельцу.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Deadlock и retry",
+          "body_markdown": "Если две транзакции берут строки в противоположном порядке, они могут образовать цикл ожидания. PostgreSQL обнаруживает deadlock и прерывает участника; одинаковый порядок блокировок уменьшает риск, но код всё равно должен обрабатывать отказ. После ошибки транзакцию откатывают; retry выполняет всю операцию на новом snapshot и имеет ограниченный budget. Внешний email или списание нельзя бездумно повторять вместе с транзакцией: отделите эффект либо используйте идемпотентный протокол.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Объясняю snapshot Read Committed.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Отличаю MVCC от полного отсутствия locks.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Блокирую строки в согласованном порядке.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Повторяю всю транзакцию с ограничением.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Почему два SELECT в Read Committed дали разные значения?",
+          "short_answer": "У statements разные snapshots.",
+          "detailed_answer": "Между ними другая транзакция могла зафиксировать обновление. Read Committed не обещает повторяемость чтения всей транзакции; выбор более строгого режима зависит от требуемого инварианта.",
+          "pitfalls": "Не считать BEGIN автоматическим замораживанием всех чтений.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Почему retry опасен для отправленного письма?",
+              "expected_answer": "Письмо не откатывается с PostgreSQL; повтор операции может отправить дубликат. Нужна идемпотентность или отдельная доставка зафиксированного события.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Как безопаснее увеличить счётчик?",
+          "short_answer": "UPDATE counters SET value=value+1.",
+          "detailed_answer": "БД координирует конкурентное изменение строки. Схема SELECT в Go и UPDATE абсолютным значением может потерять обновление; альтернативой является блокировка или оптимистическая проверка версии.",
+          "pitfalls": "Не рассчитывать только на уровень изоляции без анализа запроса.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Как снизить вероятность deadlock при переводе средств?",
+          "short_answer": "Брать оба счёта в одном стабильном порядке.",
+          "detailed_answer": "Сортировка идентификаторов до SELECT FOR UPDATE устраняет противоположный порядок этой пары. Все пути изменения должны соблюдать правило, а обработка deadlock и rollback остаётся обязательной.",
+          "pitfalls": "Не держать locks во время внешнего HTTP-вызова.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Что повторять при serialization failure?",
+          "short_answer": "Всю транзакцию, включая чтение и решение.",
+          "detailed_answer": "Старые результаты получены на snapshot, который привёл к конфликту. Новая попытка должна заново прочитать состояние; лимит, задержка и общий deadline защищают от бесконечной нагрузки.",
+          "pitfalls": "Не повторять только последний UPDATE внутри сломанной транзакции.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "PostgreSQL: Transaction Isolation",
+          "url": "https://www.postgresql.org/docs/current/transaction-iso.html",
+          "resource_type": "documentation",
+          "source_name": "PostgreSQL Global Development Group",
+          "sort_order": 10
+        },
+        {
+          "title": "PostgreSQL: Explicit Locking",
+          "url": "https://www.postgresql.org/docs/current/explicit-locking.html",
+          "resource_type": "documentation",
+          "source_name": "PostgreSQL Global Development Group",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Воспроизвести конфликт",
+          "description": "В двух SQL-сессиях выполните конкурентное увеличение, затем противоположные блокировки двух строк. Повторите с согласованным порядком и обработкой rollback.",
+          "expected_outcome": "Потерянное обновление и deadlock воспроизводятся; исправление сохраняет инвариант.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "sql-pools-migrations",
+      "title": "Пул соединений и безопасные миграции",
+      "summary": "Управлять lifecycle соединения и развивать схему без нарушения совместимости.",
+      "difficulty": "intermediate",
+      "sort_order": 60,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "sql-transactions-mvcc-locks"
+      ],
+      "sections": [
+        {
+          "heading": "Пул как ограничение ресурса",
+          "body_markdown": "database/sql DB и pgxpool управляют множеством соединений, а не являются одним соединением на каждый запрос. Размер пула ограничивает одновременно выполняемые операции и расход ресурсов сервера. Больше соединений не гарантирует больше throughput: конкуренция за CPU, locks и память может ухудшить задержку. Учитывайте число экземпляров приложения и других клиентов. Измеряйте ожидание получения соединения и длительность запроса раздельно, задавайте deadline на весь сценарий.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Владение соединением",
+          "body_markdown": "Открытый Rows, незавершённая транзакция или acquired connection удерживает ресурс пула. Закрывайте Rows, проверяйте ошибку итерации и гарантируйте rollback при любом выходе до успешного commit. Внутри транзакции выполняйте запросы через её объект: запрос к общему пулу может взять другое соединение, не увидеть незакоммиченные данные или ждать ресурс, занятый вами. При timeout проверьте фактический исход commit, если соединение оборвалось в момент подтверждения.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Совместимое изменение схемы",
+          "body_markdown": "Удаление старой колонки сразу ломает предыдущую версию приложения и rollback deployment. Expand/contract разделяет изменение: добавить совместимую колонку, обеспечить запись и backfill, переключить чтение, проверить использование, затем удалить старое. DDL может брать сильные locks; анализируйте конкретную команду и время ожидания. CREATE INDEX CONCURRENTLY имеет особый lifecycle и не выполняется внутри обычного transaction block. Версия миграции и успешный backfill — разные этапы готовности.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Считаю общий бюджет соединений.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Закрываю Rows и завершаю транзакции.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Использую объект transaction для её запросов.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Разделяю expand, backfill и contract.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Почему запрос висит при свободной CPU БД?",
+          "short_answer": "Он может ждать соединение из пула.",
+          "detailed_answer": "Утечки Rows или длительные транзакции удерживают все соединения. Проверьте статистику пула, время acquisition и lifecycle ресурсов прежде, чем увеличивать лимит.",
+          "pitfalls": "Не считать любую задержку медленным SQL.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Как выбрать размер пула?",
+              "expected_answer": "По измеренной конкуренции, времени ожидания, ресурсам PostgreSQL и сумме пулов всех реплик; универсального коэффициента от CPU нет.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Можно ли вызвать pool.Query внутри transaction?",
+          "short_answer": "Можно технически, но это другой контекст соединения.",
+          "detailed_answer": "Запрос общего пула не становится частью транзакции автоматически. Используйте tx.Query для общей атомарности и состояния; маленький пул может дополнительно создать ожидание собственного ресурса.",
+          "pitfalls": "Не передавать repository только pool, если операция требует tx.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Почему rename column опасен при rolling update?",
+          "short_answer": "Старая версия всё ещё обращается по старому имени.",
+          "detailed_answer": "Две версии приложения должны временно работать с одной схемой. Добавьте новое поле, мигрируйте данные и код совместимо, а удаление старого выполняйте после завершения перехода.",
+          "pitfalls": "Не считать наличие down migration достаточным rollback.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Когда применять CREATE INDEX CONCURRENTLY?",
+          "short_answer": "Когда важно уменьшить блокирование записей при построении.",
+          "detailed_answer": "Команда работает отдельными фазами и имеет ограничения, включая запрет обычного transaction block. После сбоя проверяйте состояние индекса; concurrency не означает отсутствие ожиданий или стоимости построения.",
+          "pitfalls": "Не оборачивать все миграции в одну транзакцию механически.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "database/sql DB",
+          "url": "https://pkg.go.dev/database/sql#DB",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "PostgreSQL ALTER TABLE",
+          "url": "https://www.postgresql.org/docs/current/sql-altertable.html",
+          "resource_type": "documentation",
+          "source_name": "PostgreSQL Global Development Group",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Проверить исчерпание и совместимость",
+          "description": "На небольшом пуле удержите Rows и измерьте ожидание следующего запроса, затем закройте ресурс. Для переименования поля составьте и выполните последовательность совместимых SQL-изменений на локальной БД.",
+          "expected_outcome": "Ресурсы освобождаются, а старая и новая версии запроса работают во время перехода.",
+          "sort_order": 10
+        }
+      ]
+    }
+  ]
+}

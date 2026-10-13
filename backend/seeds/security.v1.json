@@ -1,0 +1,763 @@
+{
+  "version": 1,
+  "category": {
+    "slug": "security",
+    "title": "Безопасность",
+    "description": "Границы доверия, защита credentials и безопасная обработка запросов Go backend.",
+    "sort_order": 110
+  },
+  "topics": [
+    {
+      "slug": "security-authentication-authorization",
+      "title": "Authentication и объектная authorization",
+      "summary": "Разделять проверку личности и права на действие, проектировать deny by default и проверять владение объектом.",
+      "difficulty": "intermediate",
+      "sort_order": 10,
+      "estimated_minutes": 45,
+      "prerequisites": [
+        "interfaces"
+      ],
+      "sections": [
+        {
+          "heading": "Личность и разрешение",
+          "body_markdown": "Authentication подтверждает, кто обращается к системе; authorization решает, разрешена ли этому субъекту конкретная операция над ресурсом. Успешный login не даёт права читать любую заметку по известному ID. Даже у приложения с одним пользователем граница должна быть явной: запрос получает проверенного субъекта из сессии, а доступ к пользовательским данным ограничивается этим субъектом. UUID затрудняет случайное угадывание, но не заменяет проверку доступа.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Место проверки",
+          "body_markdown": "Политику применяют на сервере при каждом доступе, включая альтернативные endpoints и фоновые операции. Deny by default означает отсутствие доступа без явно удовлетворённого правила. Фильтр `user_id` в запросе к БД может одновременно обеспечить изоляцию и исключить окно между чтением и проверкой. Middleware удобен для наличия сессии, но права на конкретный объект часто определяются после загрузки параметров операции. Проверки UI дают удобство, а не security boundary.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Ошибки и проверяемость",
+          "body_markdown": "Контракт различает отсутствие действительной сессии и недостаточные права, при этом не обязан раскрывать существование чужого объекта. Для login используют одинаковое сообщение при неверном имени и пароле, учитывают rate limiting и сопоставимый путь проверки. Security tests должны менять ID, пользователя и действие, а не только проверять успешный login. При ревью ищут обход политики через bulk operations, экспорт, вложенные ресурсы и старые версии API.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Различаю identity и разрешение на ресурс.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Не использую сложность ID как замену policy.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Применяю deny by default на серверной границе.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Проверяю чужой объект и альтернативные пути доступа.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Пользователь вошёл и меняет note_id в URL. Что защищает данные?",
+          "short_answer": "Серверная проверка владельца и действия.",
+          "detailed_answer": "Сессию сопоставляют с user_id ресурса или сразу ограничивают SQL этим user_id. Необходимо проверить чтение, изменение и удаление, независимо от UI.",
+          "pitfalls": "Полагаться на непредсказуемый UUID.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Чем опасен SELECT, затем UPDATE без user_id?",
+              "expected_answer": "Если update использует только ID, серверная проверка может быть обойдена другим путём; предпочтительно выразить ownership в самой операции и проверить affected rows.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Достаточно ли auth middleware для authorization?",
+          "short_answer": "Нет, оно часто проверяет лишь сессию.",
+          "detailed_answer": "Объектные права зависят от ресурса, действия и состояния. Middleware может закрыть весь private router, а сервис или запрос реализует предметную policy.",
+          "pitfalls": "Считать наличие cookie разрешением на любой endpoint.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Почему login «такого пользователя нет» раскрывает лишнее?",
+          "short_answer": "Позволяет перечислять существующие аккаунты.",
+          "detailed_answer": "Одинаковая ошибка снижает утечку через ответ; также сравнивают HTTP status, задержку и побочные эффекты, ограничивают автоматические попытки.",
+          "pitfalls": "Исправить только текст, сохранив очевидно разные пути выполнения.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Как проверить deny by default после нового endpoint?",
+          "short_answer": "Проверить отсутствие сессии и отсутствие разрешения.",
+          "detailed_answer": "Тестовая матрица включает валидного владельца, другого субъекта, несуществующий ресурс и недопустимое действие. Новые endpoints должны попадать в policy автоматически либо явно.",
+          "pitfalls": "Проверять лишь happy path.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Authentication",
+          "url": "https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html",
+          "source_name": "OWASP",
+          "resource_type": "documentation",
+          "sort_order": 10
+        },
+        {
+          "title": "Authorization",
+          "url": "https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html",
+          "source_name": "OWASP",
+          "resource_type": "documentation",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Матрица доступа к заметке",
+          "description": "Для read/update/delete опишите ожидаемые результаты владельца, чужого субъекта и запроса без сессии. Проверьте policy на учебном API с двумя fixtures.",
+          "expected_outcome": "Каждый путь ограничен субъектом; ответы не раскрывают тело чужой заметки.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "security-password-hashing",
+      "title": "Хеширование паролей и защита login",
+      "summary": "Понимать Argon2id, выбор стоимости, salt, миграцию параметров и ресурсные границы аутентификации.",
+      "difficulty": "intermediate",
+      "sort_order": 20,
+      "estimated_minutes": 45,
+      "prerequisites": [
+        "go-types-zero-values",
+        "go-errors-panic-recover"
+      ],
+      "sections": [
+        {
+          "heading": "Что защищает password hash",
+          "body_markdown": "Пароль нельзя восстановить из базы как обычное зашифрованное поле: хранят результат специального password hashing алгоритма с уникальной случайной солью. Salt не секрет и предотвращает полезность общих таблиц для одинаковых паролей. Argon2id делает массовый перебор дорогим по памяти и времени; SHA-256 слишком быстр для человеческих паролей. При утечке базы атакующий проверяет guesses offline, поэтому rate limit API не компенсирует слабый hash.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Параметры и формат",
+          "body_markdown": "OWASP рекомендует Argon2id; один минимальный профиль — 19 MiB памяти, две итерации и parallelism 1. Это исходный нижний ориентир, а окончательную стоимость измеряют на целевом сервере с допустимой конкурентностью login. Вместе с результатом сохраняют алгоритм, версию, salt и параметры. При успешной проверке hash со старыми параметрами можно заменить новым. Декодер проверяет размер и пределы параметров, чтобы повреждённая запись не заставила выделить огромную память.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Весь путь login",
+          "body_markdown": "Пароль сравнивают через корректную функцию проверки выбранного алгоритма, не через самодельную строковую криптографию. Вход ограничивают по частоте и конкурентности; дорогое вычисление не должно позволять исчерпать RAM. Для неизвестного login избегают явного быстрого пути, раскрывающего существование аккаунта. Pepper, если применяется, хранится отдельно от БД и требует плана ротации. Пароль и hash не логируют; после смены пароля пересматривают действующие сессии.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Различаю password hash, быстрый hash и encryption.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Понимаю salt и необязательный pepper.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Измеряю стоимость Argon2id и login concurrency.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Планирую rehash и ограничиваю параметры декодера.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Почему SHA-256 с солью не подходит для пароля?",
+          "short_answer": "Слишком дёшев для offline перебора.",
+          "detailed_answer": "Соль устраняет общие предвычисления, но не замедляет отдельную guess достаточно. Memory-hard KDF заставляет атакующего платить ресурсы за каждую попытку.",
+          "pitfalls": "Считать любую соль полной защитой.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Почему SHA-256 может подходить для случайного session token?",
+              "expected_answer": "У токена высокая криптографическая энтропия, он не принадлежит малому словарю человеческих паролей; задачи хранения различаются.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Можно ли увеличить memory cost до 1 GiB без измерений?",
+          "short_answer": "Это может вывести login из строя.",
+          "detailed_answer": "Память умножается на число одновременных проверок. Нужны benchmark целевой машины, ограничение concurrency и бюджет задержки, сохраняя достаточную устойчивость к перебору.",
+          "pitfalls": "Оценивать только один последовательный login.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Что делать с hash после повышения параметров Argon2id?",
+          "short_answer": "Rehash после успешного login.",
+          "detailed_answer": "Сначала проверяют пароль по сохранённому профилю, затем создают новый hash со случайной солью. Если исходный пароль неизвестен, просто пересчитать корректный password hash нельзя.",
+          "pitfalls": "Хешировать старый hash вместо пароля.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Зачем ограничивать параметры hash, прочитанного из БД?",
+          "short_answer": "Чтобы избежать неконтролируемых ресурсов.",
+          "detailed_answer": "Строка может быть повреждена или подменена. До KDF проверяют алгоритм, version, длины и допустимые memory/time/parallelism; ошибка должна быть безопасной и диагностируемой.",
+          "pitfalls": "Доверять любой PHC строке, раз она из собственной БД.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Password Storage",
+          "url": "https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html",
+          "source_name": "OWASP",
+          "resource_type": "documentation",
+          "sort_order": 10
+        },
+        {
+          "title": "Authentication",
+          "url": "https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html",
+          "source_name": "OWASP",
+          "resource_type": "documentation",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Оценить стоимость password hashing",
+          "description": "На локальном учебном сервисе измерьте один и несколько параллельных Argon2id checks с несколькими допустимыми профилями. Разберите malformed hash до запуска KDF.",
+          "expected_outcome": "Выбран профиль с объяснённым RAM budget и проверяемой стратегией rehash.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "security-sessions-cookies-csrf",
+      "title": "Сессии, cookie, CSRF и CORS",
+      "summary": "Проектировать lifecycle opaque session, атрибуты cookie и независимую защиту изменяющих запросов.",
+      "difficulty": "intermediate",
+      "sort_order": 30,
+      "estimated_minutes": 45,
+      "prerequisites": [
+        "go-types-zero-values"
+      ],
+      "sections": [
+        {
+          "heading": "Bearer credential и серверное состояние",
+          "body_markdown": "Сессионный токен — bearer credential: владение им позволяет действовать от имени пользователя. Для opaque сессии генерируют криптографически случайный токен, например 256 бит, а сервер хранит его hash и срок действия. Такой token не надо обрабатывать password KDF: высокая энтропия исключает словарный перебор. Login меняет идентификатор сессии, logout отзывает запись на сервере, а не только убирает cookie. Expiry проверяют при каждом использовании.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Ограничения cookie",
+          "body_markdown": "Secure запрещает отправку cookie по обычному HTTP, HttpOnly ограничивает чтение JavaScript, SameSite уменьшает часть межсайтовых отправок. Эти свойства не взаимозаменяемы. Cookie с Path=/ и без Domain уже имеет более узкую область, чем cookie для всех поддоменов. SameSite=Lax допускает некоторые top-level navigation с безопасными методами, поэтому GET не должен менять состояние. HttpOnly не предотвращает действия XSS в уже открытом браузере.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Защита от подделки запроса",
+          "body_markdown": "Браузер добавляет cookie автоматически, поэтому посторонний сайт может попытаться вызвать state-changing endpoint с полномочиями жертвы. SameSite — дополнительный слой, а основной протокол выбирают явно: synchronizer token или допустимая схема double-submit, проверка Origin/Referer и строгий same-origin API. При отсутствии заголовков задают документированную безопасную policy. CORS регулирует доступ JS к ответу, но не является общей защитой от отправки CSRF запроса.",
+          "sort_order": 30
+        },
+        {
+          "heading": "CORS: origin и credentials",
+          "sort_order": 40,
+          "body_markdown": "Origin включает схему, host и port. Сервер сверяет его с явным allowlist; нельзя отражать любой Origin вместе с разрешением credentials. Некоторые GET/HEAD/POST с safelisted headers уходят без preflight: запрет чтения ответа не отменяет уже выполненное действие. Для других межсайтовых запросов браузер сначала отправляет OPTIONS с ожидаемыми method и headers. Credentialed fetch требует credentials: include на клиенте, Access-Control-Allow-Credentials: true и конкретный разрешённый origin в Access-Control-Allow-Origin: wildcard * не подходит. Cookie дополнительно подчиняется SameSite и политике third-party cookies. Если ответ зависит от Origin, Vary: Origin не позволяет общему cache перепутать варианты. CORS не заменяет проверку сессии, authorization и CSRF."
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Отзываю сессию на сервере при logout.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Различаю Secure, HttpOnly и SameSite.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Оставляю GET без побочных изменений.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Проверяю CSRF независимо от CORS.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Logout очистил cookie, но украденный token работает. Почему?",
+          "short_answer": "Сессия не отозвана на сервере.",
+          "detailed_answer": "Удаление cookie меняет браузер пользователя, а копия credential остаётся пригодной. Запись сессии удаляют или инвалидируют и проверяют expiry на каждом запросе.",
+          "pitfalls": "Считать клиентское удаление отзывом bearer credential.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Что сделать при смене пароля?",
+              "expected_answer": "Ротировать текущую сессию и отозвать остальные согласно policy, проверив, что старые токены больше не принимаются.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "HttpOnly установлен. Можно ли забыть о XSS?",
+          "short_answer": "Нет, скрипт может выполнять авторизованные действия.",
+          "detailed_answer": "HttpOnly уменьшает риск чтения cookie, но malicious JS в origin имеет доступ к API и странице. Нужны безопасный вывод, sanitization и подходящая CSP.",
+          "pitfalls": "Считать флаг cookie защитой всего приложения.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Почему CORS без разрешённых origins не гарантирует защиту от CSRF?",
+          "short_answer": "Некоторые запросы отправляются без чтения ответа.",
+          "detailed_answer": "HTML form и simple requests могут дойти до API. CORS ограничивает доступ браузерного JavaScript к ответу, а сервер обязан отдельно проверять state-changing запросы.",
+          "pitfalls": "Путать запрет чтения с запретом действия.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Можно ли реализовать удаление заметки через GET при SameSite=Lax?",
+          "short_answer": "Нет, безопасные методы не должны менять состояние.",
+          "detailed_answer": "Top-level cross-site navigation может отправить Lax cookie. Удаление выполняют изменяющим методом с CSRF policy и authorization независимо от наличия UI кнопки.",
+          "pitfalls": "Считать трудность угадывания URL CSRF защитой.",
+          "sort_order": 40,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "cors-credentials",
+          "question": "Почему fetch с credentials: include отклонён при Access-Control-Allow-Origin: *?",
+          "short_answer": "Credentialed CORS требует конкретный разрешённый origin и Allow-Credentials: true.",
+          "detailed_answer": "Браузер не отдаёт такой ответ JavaScript, даже если сеть вернула 200. Сервер выбирает origin только после allowlist проверки, указывает Access-Control-Allow-Credentials: true и Vary: Origin при динамическом ответе; при preflight явно разрешает нужные методы и headers. SameSite и third-party cookie policy проверяются отдельно.",
+          "pitfalls": "Разрешать любой отражённый Origin с credentials или считать успешный preflight проверкой authorization.",
+          "sort_order": 50,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Session Management",
+          "url": "https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html",
+          "source_name": "OWASP",
+          "resource_type": "documentation",
+          "sort_order": 10
+        },
+        {
+          "title": "CSRF Prevention",
+          "url": "https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html",
+          "source_name": "OWASP",
+          "resource_type": "documentation",
+          "sort_order": 20
+        },
+        {
+          "title": "CORS — browser protocol",
+          "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS",
+          "source_name": "MDN",
+          "resource_type": "documentation",
+          "sort_order": 30
+        }
+      ],
+      "practice": [
+        {
+          "title": "Проверить протокол сессии",
+          "description": "На учебном API проверьте старый token после logout, cookie attributes и POST с чужим Origin. Используйте фиктивные credentials и не публикуйте их.",
+          "expected_outcome": "Отзыв действует серверно, межсайтовое изменение отклонено, легальный same-origin запрос проходит.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "security-sql-injection",
+      "title": "SQL injection и границы параметризации",
+      "summary": "Отделять значения от SQL синтаксиса и безопасно строить динамические фильтры и сортировку.",
+      "difficulty": "intermediate",
+      "sort_order": 40,
+      "estimated_minutes": 45,
+      "prerequisites": [
+        "go-strings"
+      ],
+      "sections": [
+        {
+          "heading": "Почему возникает injection",
+          "body_markdown": "SQL injection возникает, когда ввод меняет синтаксис команды, а не остаётся данными. Для PostgreSQL значения передают отдельными аргументами с placeholders `$1`, `$2`; драйвер не интерпретирует их как фрагменты выражения. Конкатенация login, search или ID в SQL остаётся опасной даже после поверхностной проверки кавычек. Параметризация защищает границу команды, но сама по себе не гарантирует ownership, правильность запроса или разумную стоимость выполнения.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Динамический SQL",
+          "body_markdown": "Placeholder представляет значение и не заменяет имя столбца, направление ORDER BY или произвольный оператор. Для таких элементов используют конечное отображение разрешённых пользовательских значений в заранее написанные SQL fragments. Фильтры собирают из известных частей, добавляя параметры в отдельный массив. Поиск LIKE требует решения, означают ли `%` и `_` пользовательские wildcards: это вопрос семантики и стоимости поиска, а не обычное изменение SQL грамматики.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Защита и проверка результата",
+          "body_markdown": "Права пользователя БД ограничивают необходимыми таблицами и операциями; приложение не должно работать суперпользователем. Ошибка SQL в клиентском ответе раскрывает структуру сервиса, поэтому наружу дают безопасный код, а внутрь — ограниченную диагностику. Проверки включают апострофы, Unicode, неожиданные sort keys и корректные обычные значения. Дополнительно ограничивают размер, pagination и timeout: безопасный синтаксис не мешает запросу оказаться дорогим.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Передаю значения отдельными аргументами.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Использую allowlist для сортировки и identifiers.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Различаю LIKE wildcards и SQL syntax injection.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Ограничиваю DB privilege и стоимость запроса.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "Можно ли написать ORDER BY $1 и передать имя столбца?",
+          "short_answer": "Placeholder не подставляет identifier.",
+          "detailed_answer": "Значение параметра будет значением выражения, а не синтаксическим именем. Выбирают заранее написанный fragment через allowlist, неизвестный ключ отклоняют.",
+          "pitfalls": "Конкатенировать произвольный sort после неудачи с placeholder.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Как поддержать направление сортировки?",
+              "expected_answer": "Отобразить только asc и desc в фиксированные fragments, отдельно выбрать разрешённое поле и стабильный tie-breaker.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Замена апострофа на два апострофа достаточна?",
+          "short_answer": "Предпочтительна параметризация драйвером.",
+          "detailed_answer": "Самодельное escaping зависит от диалекта и контекста. Отдельная передача arguments удерживает значение за границей SQL синтаксиса и лучше масштабируется на типы.",
+          "pitfalls": "Опираться на blacklist отдельных опасных строк.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "LIKE параметризован, но поиск % возвращает всё. Это injection?",
+          "short_answer": "Обычно это wildcard семантика.",
+          "detailed_answer": "Параметр не меняет грамматику, но `%` означает шаблон. Если нужен буквальный поиск, задают escaping wildcard и ESCAPE; также контролируют пределы выдачи.",
+          "pitfalls": "Объявлять любой широкий результат взломом SQL.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Запрос параметризован. Зачем WHERE user_id=$2?",
+          "short_answer": "Параметризация не выполняет authorization.",
+          "detailed_answer": "Она защищает синтаксис, а user_id ограничивает строки согласно policy. SQL injection и доступ к чужим данным — разные failure modes и требуют отдельных проверок.",
+          "pitfalls": "Считать prepared statement универсальной защитой данных.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "Avoiding SQL injection",
+          "url": "https://go.dev/doc/database/sql-injection",
+          "source_name": "Go project",
+          "resource_type": "documentation",
+          "sort_order": 10
+        },
+        {
+          "title": "SQL Injection Prevention",
+          "url": "https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html",
+          "source_name": "OWASP",
+          "resource_type": "documentation",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Безопасные filters и sort",
+          "description": "Напишите функцию выбора sort из трёх разрешённых полей и сборки query с параметрами. Проверьте апостроф, wildcard, чужой user_id и неизвестное направление.",
+          "expected_outcome": "Данные не меняют SQL syntax, ownership сохранён, сортировка детерминирована.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "security-ssrf",
+      "title": "SSRF и безопасные исходящие HTTP запросы",
+      "summary": "Ограничивать доверие к URL, redirects и DNS при обращении сервера к внешним ресурсам.",
+      "difficulty": "intermediate",
+      "sort_order": 50,
+      "estimated_minutes": 45,
+      "prerequisites": [
+        "go-strings",
+        "go-errors-panic-recover"
+      ],
+      "sections": [
+        {
+          "heading": "Чужой URL в доверенной сети",
+          "body_markdown": "SSRF использует сервер как посредника для запроса, который атакующий не мог выполнить напрямую. Endpoint загрузки изображения по URL может обратиться к loopback, внутреннему сервису или cloud metadata и вернуть чувствительный ответ. Проверка `https://` не достаточна: HTTPS доступен и на внутренних адресах. Сначала решают, нужен ли произвольный URL; конечный список разрешённых сервисов значительно упрощает security boundary и поддержку.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Разбор, DNS и redirect",
+          "body_markdown": "URL разбирают библиотекой, ограничивая scheme, userinfo, host и port. Проверяют все полученные IP, включая IPv6 и адреса с неожиданным представлением; запрещают внутренние и специальные диапазоны согласно policy. DNS ответ может измениться между проверкой и connect, поэтому проверка должна быть связана с фактическим адресом соединения. Redirect способен перевести разрешённый URL во внутренний endpoint: его запрещают либо повторно проверяют каждый переход и ограничивают число hops.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Ограничение ущерба",
+          "body_markdown": "Сетевые egress restrictions дополняют валидацию на уровне приложения и закрывают доступ к чувствительным подсетям. HTTP client имеет общий timeout, ограничение response body и допустимые content types; ответ не проксируют без разбора. Не пересылают incoming authorization или cookie на сторонний host. Для теста достаточно локальных имитаций внешнего и запрещённого сервиса: настоящие metadata endpoints трогать не нужно. Отказ зависимости должен возвращать понятную безопасную ошибку.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Обосновываю allowlist вместо произвольного URL.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Проверяю фактический connect address и IPv6.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Обрабатываю redirects как новую границу доверия.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Ограничиваю egress, timeout и размер ответа.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "URL имеет HTTPS и публичное имя. Почему это ещё не безопасно?",
+          "short_answer": "Имя может вести на внутренний IP или redirect.",
+          "detailed_answer": "Нужно проверить resolved адреса и фактическое соединение, исключить запрещённые диапазоны, контролировать redirects. Scheme защищает транспорт, а не назначение запроса.",
+          "pitfalls": "Доверять строковой проверке startsWith.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Что меняет DNS rebinding?",
+              "expected_answer": "Адрес при connect может отличаться от адреса при validation; policy привязывают к transport, не только предварительному lookup.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Разрешённый host вернул 302 на loopback. Что делать?",
+          "short_answer": "Отклонить или проверить новый адрес по той же policy.",
+          "detailed_answer": "Автоматический follow redirect обходит исходную проверку. В client задают CheckRedirect или запрещают redirects для этого сценария, ограничивая количество переходов.",
+          "pitfalls": "Проверять только первый URL.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "Можно ли передавать Authorization исходного запроса скачивателю?",
+          "short_answer": "Не передавайте credentials внешнему адресату.",
+          "detailed_answer": "Исходящая операция использует свой разрешённый набор headers. Incoming cookie и bearer token принадлежат приложению и при произвольном URL становятся утечкой.",
+          "pitfalls": "Копировать все headers ради удобства.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Сервис скачивания завис на огромном ответе. Это связано с SSRF защитой?",
+          "short_answer": "Да, нужны ресурсные границы.",
+          "detailed_answer": "Даже разрешённый адрес может отвечать медленно или бесконечно. Ограничивают connect/общий timeout, body size, redirects и concurrency, закрывают response body.",
+          "pitfalls": "Считать allowlist достаточной защитой доступности.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "SSRF Prevention",
+          "url": "https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html",
+          "source_name": "OWASP",
+          "resource_type": "documentation",
+          "sort_order": 10
+        },
+        {
+          "title": "net/http Client",
+          "url": "https://pkg.go.dev/net/http#Client",
+          "source_name": "Go project",
+          "resource_type": "documentation",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Проверить URL fetch policy",
+          "description": "Поднимите два локальных test servers: разрешённый и запрещённый. Проверьте прямой запрос, redirect, большой body и timeout без обращения к реальным внутренним системам.",
+          "expected_outcome": "Transport применяет policy на каждом переходе и прекращает работу по бюджету.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "security-tls-secrets",
+      "title": "TLS, доверенные proxy и управление секретами",
+      "summary": "Разделять защиту канала и жизненный цикл credentials, понимать termination и ротацию.",
+      "difficulty": "intermediate",
+      "sort_order": 60,
+      "estimated_minutes": 45,
+      "prerequisites": [
+        "go-packages-modules"
+      ],
+      "sections": [
+        {
+          "heading": "Граница TLS",
+          "body_markdown": "TLS защищает конфиденциальность и целостность транспортного соединения и проверяет peer согласно настройкам сертификатов. После termination на reverse proxy участок proxy–API становится отдельной границей: его защищают сетью или новым TLS соединением по threat model. TLS не заменяет application authorization и не делает корректными обработку входа или хранение credentials. В Go нельзя отключать проверку сертификата ради обхода ошибки: выясняют hostname, цепочку доверия и срок действия. Для современных клиентов базовая настройка — TLS 1.3; TLS 1.2 оставляют там, где требуется совместимость, с поддерживаемыми безопасными cipher suites. SSL и TLS 1.0/1.1 отключают. Проверяют negotiated protocol и параметры на реальном listener после proxy, а не только наличие https в URL; не заменяют проверку сертификата флагом InsecureSkipVerify.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Proxy и browser policy",
+          "body_markdown": "API доверяет Forwarded или X-Forwarded-Proto только от известных proxy, иначе клиент может подделать представление об origin или IP. HTTPS redirect и Secure cookie должны учитывать реальную схему внешнего запроса. HSTS помогает браузеру использовать HTTPS для будущих соединений после получения policy; preload и includeSubDomains требуют отдельного решения, так как затрагивают все подходящие адреса. Ошибочная policy может нарушить доступ к поддоменам, ещё не готовым к HTTPS.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Секрет как управляемый ресурс",
+          "body_markdown": "Пароли БД, ключи и API credentials не помещают в git, образ или frontend bundle. Для каждого секрета задают назначение, минимальные права, способ доставки, владельца и процедуру отзыва. Переменная окружения удобна, но не скрывает значение от всех процессов, dumps или ошибочных логов. Ротацию проверяют: приложение принимает новую версию, старая отозвана, rollback не возвращает скомпрометированную. При утечке удаление строки из файла не отзывает credential.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "point-1",
+          "text": "Объясняю TLS termination и оставшийся участок сети.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "point-2",
+          "text": "Не отключаю certificate verification.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "point-3",
+          "text": "Принимаю forwarded headers только от trusted proxy.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "point-4",
+          "text": "Планирую доставку, ротацию и отзыв секретов.",
+          "sort_order": 40
+        },
+        {
+          "stable_key": "tls-baseline",
+          "text": "Проверяю TLS 1.3 / совместимый TLS 1.2 и запрет SSL, TLS 1.0/1.1.",
+          "sort_order": 50
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "question-1",
+          "question": "TLS включён на proxy. Всегда ли API-to-DB трафик защищён?",
+          "short_answer": "Нет, это отдельное соединение.",
+          "detailed_answer": "Шифрование одного hop не переносится на последующие. Для внутреннего участка определяют threat model, network isolation и при необходимости проверяемый TLS с отдельными credentials.",
+          "pitfalls": "Предполагать end-to-end encryption по наличию HTTPS URL.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "TLS защищает от доступа к чужой заметке?",
+              "expected_answer": "Нет, объектную authorization выполняет приложение даже при полностью защищённом transport.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "question-2",
+          "question": "Почему InsecureSkipVerify нельзя считать обычным fix?",
+          "short_answer": "Он отключает важную проверку peer.",
+          "detailed_answer": "Нужно исправить доверенную CA, цепочку или hostname. Иначе активный посредник может представить свой сертификат и перехватить защищённый на вид канал.",
+          "pitfalls": "Оставлять временный обход в production config.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-3",
+          "question": "В git попал DB password, затем строку удалили. Что дальше?",
+          "short_answer": "Отозвать или сменить credential и оценить impact.",
+          "detailed_answer": "История и копии могли сохранить значение. Меняют secret, обновляют потребителей, ограничивают прежний доступ и проверяют логи использования, не раскрывая пароль повторно.",
+          "pitfalls": "Считать удаление файла ротацией.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "question-4",
+          "question": "Можно ли доверять X-Forwarded-For от любого HTTP клиента?",
+          "short_answer": "Нет, это подделываемый header.",
+          "detailed_answer": "Proxy должен формировать или очищать цепочку, а API доверяет только известному hop. Иначе rate limiting и audit могут использовать выбранный атакующим IP.",
+          "pitfalls": "Использовать первый адрес без модели доверия.",
+          "sort_order": 40,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "tls-audit",
+          "question": "Сайт открывается по HTTPS. Как проверить, что TLS baseline соблюдён?",
+          "short_answer": "Проверить реально согласуемые версии протокола, certificate chain и TLS 1.2 cipher policy.",
+          "detailed_answer": "Проверка должна успешно согласовать TLS 1.3 и при необходимости разрешённый TLS 1.2, но отклонять SSL и TLS 1.0/1.1. Отдельно проверяют hostname, доверие и срок сертификата; при termination тестируют внешний proxy и нужные внутренние границы. Один удачный HTTPS запрос не перечисляет все разрешённые сервером протоколы.",
+          "pitfalls": "Считать redirect на HTTPS доказательством запрета устаревших протоколов.",
+          "sort_order": 50,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "RFC 9846 — TLS 1.3",
+          "url": "https://datatracker.ietf.org/doc/html/rfc9846",
+          "source_name": "IETF",
+          "resource_type": "documentation",
+          "sort_order": 10
+        },
+        {
+          "title": "Secrets Management",
+          "url": "https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html",
+          "source_name": "OWASP",
+          "resource_type": "documentation",
+          "sort_order": 20
+        },
+        {
+          "title": "TLS configuration baseline",
+          "url": "https://cheatsheetseries.owasp.org/cheatsheets/Transport_Layer_Security_Cheat_Sheet.html",
+          "source_name": "OWASP",
+          "resource_type": "documentation",
+          "sort_order": 30
+        }
+      ],
+      "practice": [
+        {
+          "title": "Учебная ротация credentials",
+          "description": "Используйте два фиктивных ключа локального сервиса: переведите client на новый, отзовите старый и проверьте fallback. Опишите trusted proxy boundary для forwarded headers.",
+          "expected_outcome": "Новый ключ работает, старый отклоняется; секреты отсутствуют в образе и событиях.",
+          "sort_order": 10
+        }
+      ]
+    }
+  ]
+}

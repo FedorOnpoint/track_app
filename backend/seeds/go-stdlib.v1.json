@@ -1,0 +1,726 @@
+{
+  "version": 1,
+  "category": {
+    "slug": "go-stdlib",
+    "title": "Standard Library",
+    "description": "Контракты HTTP, потокового IO, JSON, времени, SQL-пула и файловой системы стандартной библиотеки.",
+    "sort_order": 40
+  },
+  "topics": [
+    {
+      "slug": "stdlib-http-client-server",
+      "title": "net/http: Client, Transport и Handler",
+      "summary": "Управлять повторным использованием connections и жизненным циклом HTTP body.",
+      "difficulty": "intermediate",
+      "sort_order": 10,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "interfaces",
+        "go-errors-panic-recover"
+      ],
+      "sections": [
+        {
+          "heading": "Server и Handler",
+          "body_markdown": "Handler получает ResponseWriter и Request; HandlerFunc адаптирует функцию к интерфейсу. Заголовки нужно задать до финального WriteHeader или Write, потому что первый Write обычно неявно фиксирует успешный status. Повторная попытка изменить финальный status после записи не переделывает уже отправленный ответ. Request.Context связан с lifecycle входящего запроса; передавайте его downstream. Не сохраняйте ResponseWriter для фоновой записи после возврата ServeHTTP: его контракт ограничен временем handler.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Client и Transport",
+          "body_markdown": "http.Client и Transport предназначены для повторного использования и безопасны для конкурентных вызовов. Transport управляет connections и keep-alive; новый Transport на каждый запрос теряет pooling и создаёт лишние sockets. Настройка http.Client.Timeout ограничивает запрос, включая чтение body, но streaming потребует иной политики deadline. Для исходящего вызова привяжите context через NewRequestWithContext. Ошибка Do не означает обязательное отсутствие side effect, а HTTP 500 обычно является response без Go error.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Body и переиспользование",
+          "body_markdown": "При успешном Do caller закрывает resp.Body. Для HTTP/1 переиспользование connection обычно требует дочитать body до EOF и закрыть его; закрытие непрочитанного body может лишить reuse. Не дренируйте бесконечный или огромный ответ ради keep-alive: ограничьте чтение по бюджету. Проверяйте status до трактовки JSON как успешного объекта. На стороне server ограничивайте input body через MaxBytesReader и считывайте необходимое в пределах handler. Реальное network поведение удобно проверять httptest.Server, а status/header unit-тестировать Recorder.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "headers",
+          "text": "Задаю headers/status до записи body.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "reuse",
+          "text": "Переиспользую Client и Transport.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "body",
+          "text": "Закрываю response body и контролирую чтение.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "status",
+          "text": "Различаю transport error и HTTP error status.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "do-500",
+          "question": "Вернёт ли Client.Do error при status 500?",
+          "short_answer": "Сам по себе HTTP 500 не является transport error.",
+          "detailed_answer": "Клиент получил корректный HTTP response; application policy проверяет status и безопасно разбирает error body.",
+          "pitfalls": "Не считать err==nil бизнес-успехом.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Когда Recorder недостаточен?",
+              "expected_answer": "Для реальных connection, streaming, cancellation и transport timeout сценариев нужен httptest.Server или network integration test.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "reuse-body",
+          "question": "Достаточно ли Close для HTTP/1 reuse?",
+          "short_answer": "Обычно нужно дочитать до EOF и закрыть body.",
+          "detailed_answer": "Неисчерпанный ответ мешает безопасно использовать stream для следующего запроса. У огромного body выбирайте bounded reading и принимайте потерю reuse.",
+          "pitfalls": "Не дренировать неограниченный input ради экономии socket.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "late-status",
+          "question": "Что произойдёт с WriteHeader(400) после Write?",
+          "short_answer": "Финальный status уже мог быть зафиксирован как 200.",
+          "detailed_answer": "Первый Write без явного status начинает response. Ошибки validation следует обнаружить до записи и выставить заголовки заранее.",
+          "pitfalls": "Не пытаться исправлять ответ после отправки успешного body.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "transport",
+          "question": "Почему не создавать новый Transport для каждого вызова?",
+          "short_answer": "Теряется pooling и растёт connection overhead.",
+          "detailed_answer": "Transport хранит idle connections и параметры dial/TLS. Долгоживущая настроенная экземплярная зависимость даёт предсказуемый lifecycle.",
+          "pitfalls": "Не оставлять множество независимых idle pools.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "net/http package",
+          "url": "https://pkg.go.dev/net/http",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "net/http/httptest",
+          "url": "https://pkg.go.dev/net/http/httptest",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Проверить HTTP adapter",
+          "description": "Сделайте client к httptest.Server, который возвращает 200, 500 и медленный body. Проверьте status mapping, closure body и cancellation через request context.",
+          "expected_outcome": "Успешная transport операция не путается с application success, body не остаётся открытым.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "stdlib-io-streams",
+      "title": "io.Reader, Writer и потоковая обработка",
+      "summary": "Обрабатывать partial reads, EOF и ошибки без неограниченной загрузки input.",
+      "difficulty": "intermediate",
+      "sort_order": 20,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "interfaces",
+        "go-arrays-slices",
+        "go-errors-panic-recover"
+      ],
+      "sections": [
+        {
+          "heading": "Контракт Reader",
+          "body_markdown": "Read(p) может вернуть меньше len(p), даже когда поток ещё не закончился. Сначала обработайте n байтов, затем err: допустимы полезные данные вместе с io.EOF. Повторяйте чтение до нужного условия; один Read не является обещанием полного сообщения. Reader не должен удерживать p после возврата, а caller не должен трактовать невызванную часть buffer как input. Для фиксированного заголовка используйте io.ReadFull, который различает отсутствие данных и частично прочитанный input через EOF/ErrUnexpectedEOF.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Writer и Copy",
+          "body_markdown": "Writer должен вернуть non-nil error, если записано меньше len(p); короткая запись без ошибки нарушает ожидаемый контракт и трактуется как ErrShortWrite подходящими helpers. io.Copy переносит поток без требования хранить его целиком, может использовать WriterTo/ReaderFrom для оптимизированного пути и возвращает число перенесённых байтов и ошибку. Успех Copy не означает, что destination долговечно сохранил данные: flush, close, sync и транзакция принадлежат соответствующему ресурсу.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Лимиты и wrappers",
+          "body_markdown": "io.ReadAll удобен только при контролируемом размере. io.LimitReader ограничивает доступные байты, но после N выдаёт EOF и сам не сообщает, что исходный input превышал N. Для проверки размера прочитайте N+1 или используйте специальный wrapper, например HTTP MaxBytesReader. Reader/Writer разделяют обработку с владением: функция, получившая io.Reader, не обязана иметь право закрывать ресурс. Close должен выполнять слой, который создал ресурс, если контракт явно не передаёт ownership. Отмена blocking Read зависит от конкретного источника.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "partial",
+          "text": "Обрабатываю n до err.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "full",
+          "text": "Использую ReadFull для фиксированного размера.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "bounded",
+          "text": "Ограничиваю ReadAll и выявляю overflow.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "owner",
+          "text": "Отделяю потоковый интерфейс от ownership Close.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "n-eof",
+          "question": "Можно ли вернуть n>0 вместе с EOF?",
+          "short_answer": "Да, данные нужно обработать перед EOF.",
+          "detailed_answer": "Reader вправе сообщить конец вместе с последними байтами или при следующем вызове. Код, который сначала возвращает err, теряет хвост.",
+          "pitfalls": "Не отбрасывать p[:n] из-за ненулевой ошибки.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Можно ли закрыть любой io.Reader?",
+              "expected_answer": "Нет, интерфейс не содержит Close; ownership и io.Closer должны быть частью явного контракта.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "limit-overflow",
+          "question": "Доказывает ли EOF от LimitReader отсутствие overflow?",
+          "short_answer": "Нет, EOF может означать достижение лимита.",
+          "detailed_answer": "Wrapper прекращает чтение на N, даже если источник содержит больше. Чтение N+1 позволяет отличить допустимый размер от превышения.",
+          "pitfalls": "Не выдавать обрезанный документ как полностью принятый.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "full-read",
+          "question": "Чем ReadFull отличается от Read?",
+          "short_answer": "Заполняет buffer или возвращает ошибку нехватки данных.",
+          "detailed_answer": "Обычный Read может вернуть частичный chunk без error. ReadFull собирает несколько chunks и использует ErrUnexpectedEOF при обрыве после части данных.",
+          "pitfalls": "Не ожидать один сетевой Read на целый header.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "copy-durable",
+          "question": "Означает ли успешный io.Copy сохранение файла на диск?",
+          "short_answer": "Нет, durable persistence требует отдельной политики.",
+          "detailed_answer": "Copy сообщает о переносе в Writer. Буферизация и ОС могут ещё удерживать данные; Sync/Close и протокол замены файла имеют самостоятельные ошибки.",
+          "pitfalls": "Не смешивать отсутствие write error с durability.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "io package",
+          "url": "https://pkg.go.dev/io",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "bufio package",
+          "url": "https://pkg.go.dev/bufio",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Разобрать fragmented input",
+          "description": "Создайте Reader, выдающий по 1–3 байта и последний chunk с EOF. Прочитайте фиксированный header и ограниченный payload, покрывая truncated и oversized inputs.",
+          "expected_outcome": "Ни один последний байт не теряется; overflow не маскируется как нормальный EOF.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "stdlib-json-contracts",
+      "title": "encoding/json: DTO, presence и строгий input",
+      "summary": "Фиксировать версию JSON-контракта и различать absent, null и zero values.",
+      "difficulty": "intermediate",
+      "sort_order": 30,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "go-types-zero-values",
+        "go-methods-embedding",
+        "go-maps"
+      ],
+      "sections": [
+        {
+          "heading": "DTO и presence",
+          "body_markdown": "JSON-структура — внешний контракт: export и tags определяют доступные fields, но struct для database не обязана быть тем же DTO. При decoding в обычный int отсутствующее поле и переданный 0 дают одинаковый zero value. Pointer различает отсутствие/нулевое число, но absent и explicit null обычно оба дают nil в новом DTO. Для PATCH с тремя состояниями используйте presence wrapper с пользовательским Unmarshal или отдельно raw object. После синтаксического decoding всё ещё нужна проверка бизнес-диапазонов и согласованности fields.",
+          "sort_order": 10
+        },
+        {
+          "heading": "v1 и v2 в Go 1.27",
+          "body_markdown": "encoding/json сохраняет совместимость v1, а encoding/json/v2 имеет отдельные defaults и options. В v1 struct field matching нечувствителен к регистру, duplicate object names могут перезаписывать/сливать значения, а numbers в any обычно становятся float64. v2 по умолчанию строже к duplicate names, использует case-sensitive matching и меняет ряд правил representation. Не переносите security или omitempty ожидания между versions без проверки документации: в v1 omitempty относится к empty Go value, в v2 — к empty JSON representation; omitzero выражает zero-value intent.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Один документ и ограничения",
+          "body_markdown": "Для существующего v1 Decoder используйте DisallowUnknownFields, если контракт должен отвергать неизвестные fields, и второй Decode до io.EOF, чтобы отклонить trailing JSON document. Эта настройка не запрещает duplicate keys и не валидирует обязательность. UseNumber предотвращает раннее превращение numeric token в float64 при decoding в any, но границы затем проверяет код. Ограничьте body до decoder и не логируйте весь неверный input. Golden tests должны фиксировать null/empty slices и zero fields для конкретного выбранного JSON API.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "presence",
+          "text": "Различаю absent, null и zero на DTO.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "version",
+          "text": "Фиксирую defaults v1/v2.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "single",
+          "text": "Проверяю EOF после одного документа.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "numbers",
+          "text": "Не теряю точность integer через float64.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "missing-zero",
+          "question": "Различает ли int поле absent и 0?",
+          "short_answer": "В новом DTO оба дают zero value.",
+          "detailed_answer": "Чтобы требовать присутствие, нужен pointer или отдельное presence tracking. Для различения explicit null и absent простой pointer обычно недостаточен.",
+          "pitfalls": "Не проверять обязательность только сравнив int с нулём.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Когда UseNumber действительно полезен?",
+              "expected_answer": "При динамических JSON числах в any; для заранее известного int64 field decoding уже проверяет представимость соответствующего типа.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "unknown-duplicates",
+          "question": "Запрещает ли v1 DisallowUnknownFields duplicate keys?",
+          "short_answer": "Нет, это другая проверка.",
+          "detailed_answer": "Она отвергает fields без соответствующего struct field. Duplicate names входят в compatibility behavior v1; строгая политика требует другого decoder/protocol.",
+          "pitfalls": "Не называть эту опцию полной строгой JSON validation.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "two-documents",
+          "question": "Почему одного Decode недостаточно?",
+          "short_answer": "После первого значения может идти второе JSON значение.",
+          "detailed_answer": "Decoder предназначен и для streams. Для single-document body выполните дополнительный Decode и потребуйте io.EOF.",
+          "pitfalls": "Не принимать {\"a\":1}{\"a\":2} как обычный body.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "v2-omitempty",
+          "question": "Почему migration v1→v2 требует contract tests?",
+          "short_answer": "Меняются defaults и правила representation.",
+          "detailed_answer": "Включая field matching, duplicates и omitempty; bool/number zero могут потребовать omitzero для прежнего intent. Проверяйте payloads реальных клиентов.",
+          "pitfalls": "Не считать одинаковые Marshal сигнатуры одинаковой wire semantics.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "encoding/json compatibility API",
+          "url": "https://pkg.go.dev/encoding/json",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "encoding/json/v2 API",
+          "url": "https://pkg.go.dev/encoding/json/v2",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Проверить JSON boundary",
+          "description": "Сделайте DTO update с presence для имени и возраста. Проверьте absent/null/zero, unknown field, два документа и большие integers. Для v1/v2 сравните golden payloads.",
+          "expected_outcome": "Validation не зависит от случайного zero value; выбранная version semantics зафиксирована сценариями.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "stdlib-time-timers",
+      "title": "time.Time, Duration и timers",
+      "summary": "Различать wall clock, monotonic измерение и календарные интервалы.",
+      "difficulty": "intermediate",
+      "sort_order": 40,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "go-types-zero-values"
+      ],
+      "sections": [
+        {
+          "heading": "Две шкалы времени",
+          "body_markdown": "time.Now может включать wall clock для календарного представления и monotonic reading для устойчивого измерения elapsed time. Sub/Since используют monotonic составляющую, когда она есть у обоих значений; сериализация и parse её не сохраняют. Поэтому duration работы измеряйте time.Since(start), а timestamps обмена представляйте RFC 3339 с явной зоной, обычно UTC. Сравнение Time через == учитывает representation, включая location и monotonic data; Equal проверяет равенство момента с подходящей semantics.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Duration не календарь",
+          "body_markdown": "time.Duration — целое число nanoseconds, а не месяц или календарный день. time.Hour*24 означает прошедшие 24 часа; AddDate(0,0,1) означает календарный сдвиг и около DST может отличаться по elapsed duration. Для business schedules определите timezone и поведение неоднозначного/отсутствующего локального времени. Time.Parse использует layout-пример 2006-01-02, а не strftime placeholders. Unix timestamp не хранит timezone и не заменяет правила calendar arithmetic.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Timers и lifecycle",
+          "body_markdown": "Timer сигнализирует один раз, Ticker — периодически, но может корректировать или пропускать ticks для медленного receiver. Он не гарантирует исполнение работы строго каждую секунду. В Go 1.27 channel timers используют синхронный канал, а Stop/Reset дают гарантии отсутствия stale values после возврата; до Go 1.23 требовалась другая координация с drain. Не копируйте старый recipe в современный код механически. Stop полезен для прекращения ненужных событий, хотя GC современных timers собирает недостижимые timers без обязательного Stop. У AfterFunc Reset и завершение callback имеют другой контракт: Reset не выполняет join callback. Ticker.Stop не закрывает Ticker.C: consumer с for range ticker.C не завершится только из-за Stop. Выход организуют отдельным ctx.Done/stop signal в select, а завершение consumer подтверждают join. Для AfterFunc Stop с результатом false не означает, что callback уже закончил работу: он мог стартовать и ещё выполняться, поэтому завершение согласуют отдельным channel/WaitGroup.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "monotonic",
+          "text": "Использую Since для elapsed time.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "calendar",
+          "text": "Различаю AddDate и 24*time.Hour.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "timer",
+          "text": "Различаю современные channel timer guarantees и старые recipes.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "ticks",
+          "text": "Не считаю ticks гарантированным расписанием work.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "equal",
+          "question": "Почему t1==t2 может отличаться от t1.Equal(t2)?",
+          "short_answer": "== сравнивает representation, Equal — момент.",
+          "detailed_answer": "Два timestamps могут иметь разные location или monotonic компоненты и указывать на один момент. Для бизнес-сравнения выберите намеренную semantics.",
+          "pitfalls": "Не использовать == без нормализации ключей Time.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Сохраняется ли monotonic reading в JSON timestamp?",
+              "expected_answer": "Нет, при сериализации оно теряется; elapsed измерение через восстановленный timestamp использует wall clock.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "dst",
+          "question": "Почему календарный день не всегда 24 часа?",
+          "short_answer": "Timezone может перейти на DST или обратно.",
+          "detailed_answer": "AddDate сдвигает календарную дату в location, тогда как Duration прибавляет elapsed nanoseconds. Выбор зависит от расписания или измерения интервала.",
+          "pitfalls": "Не хранить месяц как фиксированный duration.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "ticker-drop",
+          "question": "Получит ли slow consumer все ticks?",
+          "short_answer": "Нет, Ticker может пропускать/корректировать ticks.",
+          "detailed_answer": "Он поддерживает периодическую сигнализацию, но не надёжную очередь заданий. Для обязательного каждого запуска нужен явный scheduler/storage protocol. Stop не закрывает канал C; остановка receiver требует независимого cancellation signal и ожидания завершения.",
+          "pitfalls": "Не считать число ticks точным числом прошедших периодов.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "timer-reset",
+          "question": "Нужен ли старый drain pattern при каждом Reset?",
+          "short_answer": "Не при современных channel timer guarantees.",
+          "detailed_answer": "В Go 1.27 receive после Reset не получает значение прежней настройки channel timer. Старые recipes относятся к более ранним версиям; AfterFunc требует отдельной координации завершения callback. AfterFunc.Stop не ожидает уже запущенный callback; при необходимости join реализуют отдельно.",
+          "pitfalls": "Не переносить channel timer guarantees на lifecycle AfterFunc callback.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "time package",
+          "url": "https://pkg.go.dev/time",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Go timer channel changes",
+          "url": "https://go.dev/wiki/Go123Timer",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Проверить границу DST",
+          "description": "В location с DST сравните AddDate и Add(24*time.Hour) вокруг перехода. Добавьте cancellation-aware ticker loop и корректный Stop.",
+          "expected_outcome": "Calendar result и elapsed duration объяснены отдельно; loop не остаётся активным после cancel.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "stdlib-sql-pool",
+      "title": "database/sql: pool, Rows и transactions",
+      "summary": "Различать DB handle и connection, закрывать Rows и сохранять transactional boundary.",
+      "difficulty": "intermediate",
+      "sort_order": 50,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "go-errors-panic-recover",
+        "interfaces"
+      ],
+      "sections": [
+        {
+          "heading": "DB как pool",
+          "body_markdown": "sql.DB — безопасный для concurrent use долгоживущий handle, управляющий pool connections; sql.Open обычно не проверяет доступность сервера немедленно. Для startup readiness используйте PingContext с ограниченным бюджетом. SetMaxOpenConns ограничивает открытые connections, а SetMaxIdleConns и lifetime/idle time регулируют reuse. Лимит connections — не бесплатная защита: при насыщении операции ждут слот и могут превышать latency budget. DB.Stats помогает увидеть WaitCount, WaitDuration и InUse.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Rows удерживает ресурс",
+          "body_markdown": "После QueryContext закройте Rows, особенно при раннем выходе из цикла. Next сообщает о наличии следующей строки, Scan читает её, а Rows.Err после цикла выявляет error итерации, которую false от Next не объясняет. QueryRow откладывает error до Scan и возвращает ErrNoRows для отсутствия строки. Null database values требуют nullable destination или явного contract; sql.NullString отличается от обычного string. Не держите Rows открытым во время unrelated IO, если этим удерживается connection и transaction.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Transaction на одном connection",
+          "body_markdown": "BeginTx создаёт Tx, чьи операции принадлежат одной connection и transaction. Не вызывайте DB.Exec внутри transaction path: он может взять другую connection и выполнить работу вне transaction. Типичный lifecycle — defer Rollback как cleanup, проверки каждого statement, затем проверка Commit. При ошибке Commit нельзя безусловно считать business effect отсутствующим; классификация зависит от драйвера и состояния соединения. Context помогает ограничить ожидание, а placeholders защищают values, но не произвольные SQL identifiers.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "pool",
+          "text": "Отличаю DB от выделенной connection.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "rows",
+          "text": "Закрываю Rows и проверяю Rows.Err.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "tx",
+          "text": "Использую только Tx внутри transactional path.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "limits",
+          "text": "Наблюдаю pool wait и задаю бюджет.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "open-ping",
+          "question": "Доказывает ли sql.Open доступность database?",
+          "short_answer": "Обычно нет, нужен PingContext или операция.",
+          "detailed_answer": "Open создаёт handle и проверяет часть конфигурации; фактическое соединение может быть отложено. Readiness должна иметь timeout и понятную policy.",
+          "pitfalls": "Не объявлять startup healthy только по nil error Open.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Нужно ли defer Rollback после BeginTx?",
+              "expected_answer": "Да, это cleanup для всех error paths; после успешного Commit Rollback уже не отменяет committed transaction.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "rows-err",
+          "question": "Зачем Rows.Err после Next loop?",
+          "short_answer": "False от Next может означать error, а не только конец.",
+          "detailed_answer": "Сетевая/driver ошибка итерации возникает после успешного Query. Без Err приложение способно вернуть неполный результат как полный.",
+          "pitfalls": "Не проверять только error от Scan.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "tx-db",
+          "question": "Что не так с DB.Exec после BeginTx?",
+          "short_answer": "Операция не обязана входить в созданную transaction.",
+          "detailed_answer": "DB может выбрать другую connection. Используйте Tx.ExecContext и Tx.QueryContext для единой atomic boundary.",
+          "pitfalls": "Не путать lexical scope Go с SQL transaction scope.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "pool-deadlock",
+          "question": "Как MaxOpenConns=1 может вызвать self-deadlock?",
+          "short_answer": "Код удерживает connection и ждёт новую из того же pool.",
+          "detailed_answer": "Например, открытые Rows или Tx удерживают единственный слот, а вложенная DB operation ждёт его освобождения. Исправьте lifecycle или используйте тот же Tx.",
+          "pitfalls": "Не лечить structural deadlock только увеличением pool.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "database/sql API",
+          "url": "https://pkg.go.dev/database/sql",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "Managing database connections",
+          "url": "https://go.dev/doc/database/manage-connections",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Проверить pool starvation",
+          "description": "На test database установите MaxOpenConns=1, откройте Rows и попытайтесь другую operation с timeout. Затем закройте Rows и выполните transaction только через Tx.",
+          "expected_outcome": "Wait подтверждён Stats/timeout; правильный lifecycle освобождает слот и сохраняет transaction boundary.",
+          "sort_order": 10
+        }
+      ]
+    },
+    {
+      "slug": "stdlib-filesystem-testing",
+      "title": "Filesystem, io/fs и тестирование boundaries",
+      "summary": "Выбирать capability для файлов и проверять lifecycle через testing и временные directories.",
+      "difficulty": "intermediate",
+      "sort_order": 60,
+      "estimated_minutes": 40,
+      "prerequisites": [
+        "interfaces",
+        "go-errors-panic-recover"
+      ],
+      "sections": [
+        {
+          "heading": "Разные уровни файлового API",
+          "body_markdown": "os работает с реальной файловой системой и ресурсами, io/fs описывает read-oriented abstraction с names относительно корня, filepath — platform-specific paths. Путь пользователя нельзя считать безопасным только после Clean: это lexical нормализация, не доказательство containment или защита от symlink traversal. Для чтения assets полезны embed.FS и fs.ReadFile, а для тестов — fstest.MapFS. При работе с untrusted paths рассмотрите os.Root и его документированные ограничения вместо самодельного prefix check.",
+          "sort_order": 10
+        },
+        {
+          "heading": "Запись и failure paths",
+          "body_markdown": "После Open/Create назначьте владельца Close и проверяйте write/close errors там, где они влияют на результат. Для замены конфигурации часто пишут временный файл в том же directory, завершают запись, при необходимости Sync и затем Rename; гарантии атомарности и durability зависят от ОС и filesystem, особенно при замене существующего target. Установите permissions и policy cleanup. Не объявляйте единый Rename универсальной транзакцией между directories или файловыми системами.",
+          "sort_order": 20
+        },
+        {
+          "heading": "Проверяемый boundary",
+          "body_markdown": "testing.T.TempDir создаёт изолированное временное дерево и автоматически удаляет его; t.Cleanup регистрирует release ресурса для test lifecycle. Table-driven cases удобно покрывают отсутствующий файл, permission/IO failure, invalid path и partial write. Не проверяйте только happy path с os.WriteFile, если production code должен обрабатывать streaming и error close. Fakes должны воспроизводить контракт Reader/Writer, а integration test нужен для поведения ОС, которое MapFS не моделирует: symlinks, rename и permissions.",
+          "sort_order": 30
+        }
+      ],
+      "checklist": [
+        {
+          "stable_key": "fs",
+          "text": "Различаю os, io/fs и filepath.",
+          "sort_order": 10
+        },
+        {
+          "stable_key": "path",
+          "text": "Не считаю Clean защитой от traversal.",
+          "sort_order": 20
+        },
+        {
+          "stable_key": "write",
+          "text": "Проверяю write/close и нужную durability.",
+          "sort_order": 30
+        },
+        {
+          "stable_key": "test",
+          "text": "Покрываю реальные filesystem failure boundaries.",
+          "sort_order": 40
+        }
+      ],
+      "questions": [
+        {
+          "stable_key": "clean",
+          "question": "Защищает ли filepath.Clean от symlink escape?",
+          "short_answer": "Нет, это lexical обработка пути.",
+          "detailed_answer": "Symlink может вести за пределы разрешённого directory. Containment нужно обеспечивать специализированным API/политикой доступа, учитывая races filesystem.",
+          "pitfalls": "Не проверять безопасность одним strings.HasPrefix.",
+          "sort_order": 10,
+          "follow_ups": [
+            {
+              "question": "Когда os.Root полезнее проверки строки пути?",
+              "expected_answer": "Когда операции должны оставаться в заданном корне при untrusted relative paths; проверьте его security contract и platform caveats.",
+              "sort_order": 10
+            }
+          ]
+        },
+        {
+          "stable_key": "mapfs",
+          "question": "Что fstest.MapFS не заменяет?",
+          "short_answer": "Реальное поведение ОС и filesystem.",
+          "detailed_answer": "Он удобен для read-only content contracts, но не моделирует все permission, rename, symlink и durability semantics.",
+          "pitfalls": "Не считать fake доказательством безопасной работы на disk.",
+          "sort_order": 20,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "rename",
+          "question": "Гарантирует ли Rename durable atomic replacement везде?",
+          "short_answer": "Нет, контракт зависит от platform и операции.",
+          "detailed_answer": "Возможности замены existing target и cross-filesystem move различаются; durability после crash требует дополнительных шагов и источника гарантий.",
+          "pitfalls": "Не обещать переносимую transaction одним Rename.",
+          "sort_order": 30,
+          "follow_ups": []
+        },
+        {
+          "stable_key": "cleanup",
+          "question": "Почему TempDir удобнее фиксированного /tmp/test?",
+          "short_answer": "Изоляция и автоматический cleanup.",
+          "detailed_answer": "Tests не конфликтуют по одному имени и освобождают файлы при завершении. Cleanup resources выполняйте через t.Cleanup в правильном порядке зависимостей.",
+          "pitfalls": "Не оставлять temporary fixtures после запуска.",
+          "sort_order": 40,
+          "follow_ups": []
+        }
+      ],
+      "resources": [
+        {
+          "title": "os package and Root",
+          "url": "https://pkg.go.dev/os",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 10
+        },
+        {
+          "title": "testing package",
+          "url": "https://pkg.go.dev/testing",
+          "resource_type": "documentation",
+          "source_name": "Go project",
+          "sort_order": 20
+        }
+      ],
+      "practice": [
+        {
+          "title": "Проверить файловый loader",
+          "description": "Напишите loader через fs.FS с table cases на MapFS, затем отдельный TempDir integration scenario для missing file и invalid user path policy.",
+          "expected_outcome": "Tests различают логический контракт чтения и гарантии реальной файловой системы; временные files удаляются.",
+          "sort_order": 10
+        }
+      ]
+    }
+  ]
+}
