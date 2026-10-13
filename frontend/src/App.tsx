@@ -68,6 +68,7 @@ export function App() {
       </form>
       <div className="content-grid" id="map">
         <aside className="filters" aria-label="Фильтры каталога">
+          <label className="mobile-category-filter">Раздел<select value={category} onChange={(event) => updateFilters({ category: event.target.value })}><option value="">Все темы</option>{categories.map((item) => <option key={item.id} value={item.slug}>{item.title}</option>)}</select></label>
           <div className="filter-heading"><h2>Разделы</h2><span>{categories.length}</span></div>
           <button className={!category ? 'filter-option selected' : 'filter-option'} onClick={() => updateFilters({ category: '' })} type="button"><span>Все темы</span><span>↗</span></button>
           {categories.map((item) => <button className={category === item.slug ? 'filter-option selected' : 'filter-option'} onClick={() => updateFilters({ category: item.slug })} type="button" key={item.id}><span>{item.title}</span><span>↗</span></button>)}
