@@ -82,7 +82,7 @@ cd-dry-run:
 
 tools:
 	mkdir -p .tools
-	cd backend && GOBIN=$(CURDIR)/.tools $(GO) install honnef.co/go/tools/cmd/staticcheck@v0.8.1
+	cd backend && GOBIN=$(CURDIR)/.tools $(GO) install honnef.co/go/tools/cmd/staticcheck@v0.8.2
 	cd backend && GOBIN=$(CURDIR)/.tools $(GO) install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
 	cd backend && GOBIN=$(CURDIR)/.tools $(GO) install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 	cd backend && GOBIN=$(CURDIR)/.tools $(GO) install golang.org/x/vuln/cmd/govulncheck@v1.8.0
