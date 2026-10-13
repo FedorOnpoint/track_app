@@ -7,7 +7,7 @@ export function AppLayout() {
   const { user, logout } = useAuth()
   const location = useLocation()
   const content = useRef<HTMLDivElement>(null)
-  useEffect(() => { content.current?.focus() }, [location.pathname])
+  useEffect(() => { content.current?.focus({ preventScroll: true }) }, [location.pathname])
   if (!user) return null
 
   return <div className="app-shell">

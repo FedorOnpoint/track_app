@@ -61,6 +61,17 @@ test('reduced motion disables smooth scrolling', async ({ page }) => {
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior)).toBe('auto')
 })
 
+test('top navigation does not scroll the page when moving focus to content', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/track')
+  await expect(page.getByRole('heading', { name: 'Трек подготовки' })).toBeVisible()
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }))
+  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Настройки', exact: true })).toBeVisible()
+  await expect(page.locator('#page-content')).toBeFocused()
+  expect(await page.evaluate(() => window.scrollY)).toBe(0)
+})
+
 test('status filter works with the keyboard and Escape preserves the selection', async ({ page }) => {
   await page.goto('/track')
   const status = page.getByRole('combobox', { name: 'Статус', exact: true })
