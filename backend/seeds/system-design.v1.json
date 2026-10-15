@@ -13,7 +13,7 @@
       "summary": "Выбирать ключи и допустимую устарелость, сохранять изоляцию пользователей и ограничивать нагрузку на miss.",
       "difficulty": "intermediate",
       "sort_order": 10,
-      "estimated_minutes": 45,
+      "estimated_minutes": 135,
       "prerequisites": [
         "go-maps"
       ],
@@ -131,7 +131,7 @@
       "summary": "Разделять publisher confirm и consumer ack, проектировать idempotent обработку и bounded retries.",
       "difficulty": "intermediate",
       "sort_order": 20,
-      "estimated_minutes": 45,
+      "estimated_minutes": 120,
       "prerequisites": [
         "go-errors-panic-recover"
       ],
@@ -249,7 +249,7 @@
       "summary": "Выбирать распределение запросов с учётом соединений, готовности реплик и ограничений общих зависимостей.",
       "difficulty": "intermediate",
       "sort_order": 30,
-      "estimated_minutes": 45,
+      "estimated_minutes": 90,
       "prerequisites": [
         "go-types-zero-values"
       ],
@@ -367,7 +367,7 @@
       "summary": "Понимать lag, уровни подтверждения commit и риск split-brain при переключении primary.",
       "difficulty": "intermediate",
       "sort_order": 40,
-      "estimated_minutes": 45,
+      "estimated_minutes": 90,
       "prerequisites": [
         "go-errors-panic-recover"
       ],
@@ -485,7 +485,7 @@
       "summary": "Выбирать ключ разделения данных и объяснять стоимость cross-shard операций и перераспределения.",
       "difficulty": "intermediate",
       "sort_order": 50,
-      "estimated_minutes": 45,
+      "estimated_minutes": 105,
       "prerequisites": [
         "go-maps"
       ],
@@ -603,7 +603,7 @@
       "summary": "Проектировать timeout budgets, retries, backpressure и поведение при потере связи между компонентами.",
       "difficulty": "intermediate",
       "sort_order": 60,
-      "estimated_minutes": 45,
+      "estimated_minutes": 135,
       "prerequisites": [
         "go-errors-panic-recover"
       ],

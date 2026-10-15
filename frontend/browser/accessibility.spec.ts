@@ -3,6 +3,7 @@ import { test, expect } from './fixtures'
 
 const screens = [
   ['/login', 'С возвращением'],
+  ['/register', 'Создать аккаунт'],
   ['/', 'Обзор подготовки'],
   ['/topics', 'Карта знаний'],
   ['/topics/goroutines', 'Горутины и планировщик'],
@@ -100,4 +101,27 @@ test('mobile catalog filters keep category and difficulty when used together', a
   await expect(page).toHaveURL(/category=concurrency/)
   await expect(page).toHaveURL(/difficulty=advanced/)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})
+
+test('invited registration shows server errors and opens the dashboard after success', async ({ page }) => {
+  let attempts = 0
+  await page.route('**/api/v1/auth/register', route => {
+    attempts++
+    return attempts === 1
+      ? route.fulfill({ status: 400, json: { error: { code: 'invalid_invitation', message: 'Код приглашения неверен, истёк или уже использован' } } })
+      : route.fulfill({ status: 201, json: { data: { id: 'new-user', login: 'alice' } } })
+  })
+  await page.goto('/login')
+  await page.getByRole('link', { name: 'Создать аккаунт', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Создать аккаунт', exact: true })).toBeVisible()
+  await page.getByLabel('Логин', { exact: true }).fill('alice')
+  await page.getByLabel('Пароль', { exact: true }).fill('safe-test-password')
+  await page.getByLabel('Повторите пароль', { exact: true }).fill('safe-test-password')
+  await page.getByLabel('Код приглашения', { exact: true }).fill('a'.repeat(43))
+  await page.getByRole('button', { name: 'Создать аккаунт', exact: true }).click()
+  await expect(page.getByRole('alert')).toContainText('Код приглашения неверен')
+  await page.getByLabel('Код приглашения', { exact: true }).fill('b'.repeat(43))
+  await page.getByRole('button', { name: 'Создать аккаунт', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Обзор подготовки', exact: true })).toBeVisible()
+  expect(attempts).toBe(2)
 })

@@ -13,7 +13,7 @@
       "summary": "Разделять код по причинам изменения и контролировать зависимости между частями приложения.",
       "difficulty": "intermediate",
       "sort_order": 10,
-      "estimated_minutes": 40,
+      "estimated_minutes": 45,
       "prerequisites": [
         "go-packages-modules"
       ],
@@ -131,7 +131,7 @@
       "summary": "Направлять зависимости к потребностям бизнес-операции, а не к деталям адаптера.",
       "difficulty": "intermediate",
       "sort_order": 20,
-      "estimated_minutes": 40,
+      "estimated_minutes": 90,
       "prerequisites": [
         "architecture-cohesion-coupling",
         "interfaces"
@@ -250,7 +250,7 @@
       "summary": "Собирать зависимости явно и управлять их lifecycle в точке запуска.",
       "difficulty": "intermediate",
       "sort_order": 30,
-      "estimated_minutes": 40,
+      "estimated_minutes": 75,
       "prerequisites": [
         "architecture-dependency-inversion"
       ],
@@ -368,7 +368,7 @@
       "summary": "Выражать операции хранения без потери атомарности бизнес-сценария.",
       "difficulty": "intermediate",
       "sort_order": 40,
-      "estimated_minutes": 40,
+      "estimated_minutes": 120,
       "prerequisites": [
         "architecture-dependency-inversion"
       ],
@@ -486,7 +486,7 @@
       "summary": "Сохранять предметные границы в одном процессе и осознанно выбирать коммуникацию.",
       "difficulty": "intermediate",
       "sort_order": 50,
-      "estimated_minutes": 40,
+      "estimated_minutes": 105,
       "prerequisites": [
         "architecture-cohesion-coupling"
       ],
@@ -604,7 +604,7 @@
       "summary": "Отделять полезные порты от церемоний и удерживать правила независимо от HTTP и SQL.",
       "difficulty": "intermediate",
       "sort_order": 60,
-      "estimated_minutes": 40,
+      "estimated_minutes": 105,
       "prerequisites": [
         "architecture-dependency-inversion",
         "architecture-di-composition"

@@ -7,6 +7,9 @@ x-app-environment: &app-environment
   DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
   SESSION_TTL: ${SESSION_TTL:-168h}
   LOG_LEVEL: ${LOG_LEVEL:-info}
+  AGENT_API_TOKEN_SHA256: ${AGENT_API_TOKEN_SHA256:-}
+  AGENT_USER_ID: ${AGENT_USER_ID:-}
+  AGENT_TOKEN_EXPIRES_AT: ${AGENT_TOKEN_EXPIRES_AT:-}
 
 x-job: &job
   image: ${API_IMAGE:?set API_IMAGE to an immutable image reference}

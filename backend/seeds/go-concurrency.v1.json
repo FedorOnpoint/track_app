@@ -13,7 +13,7 @@
       "summary": "Давать каждой goroutine владельца, условие выхода и способ дождаться завершения.",
       "difficulty": "intermediate",
       "sort_order": 10,
-      "estimated_minutes": 40,
+      "estimated_minutes": 90,
       "prerequisites": [
         "go-functions-defer",
         "go-errors-panic-recover"
@@ -132,7 +132,7 @@
       "summary": "Строить протокол передачи данных с явным владельцем close и поведением nil channels.",
       "difficulty": "intermediate",
       "sort_order": 20,
-      "estimated_minutes": 40,
+      "estimated_minutes": 105,
       "prerequisites": [
         "goroutines"
       ],
@@ -250,7 +250,7 @@
       "summary": "Передавать бюджет операции и освобождать связанные ресурсы по явной цепочке отмены.",
       "difficulty": "intermediate",
       "sort_order": 30,
-      "estimated_minutes": 40,
+      "estimated_minutes": 90,
       "prerequisites": [
         "goroutines",
         "go-errors-panic-recover"
@@ -369,7 +369,7 @@
       "summary": "Защищать invariants и выбирать синхронизацию по контракту и contention.",
       "difficulty": "intermediate",
       "sort_order": 40,
-      "estimated_minutes": 40,
+      "estimated_minutes": 105,
       "prerequisites": [
         "go-maps",
         "go-types-zero-values"
@@ -488,7 +488,7 @@
       "summary": "Ожидать задачи без ошибок регистрации и ограничивать одновременно выполняемую работу.",
       "difficulty": "intermediate",
       "sort_order": 50,
-      "estimated_minutes": 40,
+      "estimated_minutes": 120,
       "prerequisites": [
         "goroutines",
         "concurrency-channels-select"
@@ -607,7 +607,7 @@
       "summary": "Проектировать поток данных с ограниченной памятью и корректным ранним завершением.",
       "difficulty": "intermediate",
       "sort_order": 60,
-      "estimated_minutes": 40,
+      "estimated_minutes": 135,
       "prerequisites": [
         "concurrency-channels-select",
         "concurrency-context-cancellation"

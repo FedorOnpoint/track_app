@@ -13,7 +13,7 @@
       "summary": "Проверять поведение набором читаемых случаев и изолировать lifecycle тестовых ресурсов.",
       "difficulty": "intermediate",
       "sort_order": 10,
-      "estimated_minutes": 40,
+      "estimated_minutes": 60,
       "prerequisites": [
         "go-functions-defer",
         "go-errors-panic-recover"
@@ -132,7 +132,7 @@
       "summary": "Заменять внешние эффекты на нужном уровне и не тестировать порядок внутренних вызовов без причины.",
       "difficulty": "intermediate",
       "sort_order": 20,
-      "estimated_minutes": 40,
+      "estimated_minutes": 105,
       "prerequisites": [
         "interfaces",
         "testing-table-subtests"
@@ -251,7 +251,7 @@
       "summary": "Проверять handler contracts отдельно от сетевого lifecycle и middleware composition.",
       "difficulty": "intermediate",
       "sort_order": 30,
-      "estimated_minutes": 40,
+      "estimated_minutes": 90,
       "prerequisites": [
         "testing-fakes-mocks-contracts"
       ],
@@ -369,7 +369,7 @@
       "summary": "Проверять PostgreSQL adapters в изолированном окружении с настоящими миграциями.",
       "difficulty": "intermediate",
       "sort_order": 40,
-      "estimated_minutes": 40,
+      "estimated_minutes": 120,
       "prerequisites": [
         "testing-fakes-mocks-contracts"
       ],
@@ -487,7 +487,7 @@
       "summary": "Находить наблюдаемые гонки и неожиданные входы без ложного обещания полной корректности.",
       "difficulty": "intermediate",
       "sort_order": 50,
-      "estimated_minutes": 40,
+      "estimated_minutes": 105,
       "prerequisites": [
         "testing-table-subtests"
       ],
@@ -605,7 +605,7 @@
       "summary": "Измерять репрезентативную работу и выбирать набор тестов по риску и стоимости обратной связи.",
       "difficulty": "intermediate",
       "sort_order": 60,
-      "estimated_minutes": 40,
+      "estimated_minutes": 100,
       "prerequisites": [
         "testing-table-subtests",
         "go-arrays-slices"

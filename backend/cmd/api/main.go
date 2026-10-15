@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/FedorOnpoint/track_app/backend/internal/agentprogress"
 	"github.com/FedorOnpoint/track_app/backend/internal/auth"
 	"github.com/FedorOnpoint/track_app/backend/internal/bookmarks"
 	"github.com/FedorOnpoint/track_app/backend/internal/catalog"
@@ -39,6 +40,10 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("load configuration: %w", err)
 	}
+	agentCredentials, err := agentprogress.LoadCredentials(os.Getenv)
+	if err != nil {
+		return fmt.Errorf("load agent configuration: %w", err)
+	}
 
 	connectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -56,8 +61,10 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	catalogQueries := catalogdb.New(pool)
 	progressStore := progress.NewPostgresStore(pool)
 	authHandler := auth.NewHandler(auth.NewService(auth.NewPostgresSessionStore(pool), auth.NewPasswordService(), cfg.SessionTTL), cfg.Environment == "production")
+	authHandler.WithRegistration(auth.NewRegistrationService(auth.NewPostgresRegistrationStore(pool), auth.NewPasswordService(), cfg.SessionTTL))
 	server := httpserver.NewServer(cfg.Addr, httpserver.NewHandler(pool, logger, httpserver.SecurityConfig{Environment: cfg.Environment, Domain: cfg.Domain}, func(router chi.Router) {
 		authHandler.Mount(router)
+		agentprogress.Mount(router, agentprogress.NewPostgresStore(pool), agentCredentials)
 		router.Group(func(protected chi.Router) {
 			protected.Use(authHandler.Require)
 			personalizedStore := catalog.NewPostgresPersonalizedStore(pool)

@@ -13,7 +13,7 @@
       "summary": "Понимать время жизни значений и проверять решения компилятора вместо правил по синтаксису.",
       "difficulty": "intermediate",
       "sort_order": 10,
-      "estimated_minutes": 40,
+      "estimated_minutes": 90,
       "prerequisites": [
         "go-types-zero-values",
         "go-functions-defer"
@@ -132,7 +132,7 @@
       "summary": "Различать скорость allocations, live heap и удержание большого backing array.",
       "difficulty": "intermediate",
       "sort_order": 20,
-      "estimated_minutes": 40,
+      "estimated_minutes": 105,
       "prerequisites": [
         "go-arrays-slices",
         "go-maps",
@@ -252,7 +252,7 @@
       "summary": "Настраивать компромисс CPU/память и понимать мягкий предел runtime.",
       "difficulty": "intermediate",
       "sort_order": 30,
-      "estimated_minutes": 40,
+      "estimated_minutes": 120,
       "prerequisites": [
         "runtime-allocation-retention"
       ],
@@ -370,7 +370,7 @@
       "summary": "Различать goroutine, OS thread и ресурс выполнения, не полагаясь на порядок планирования.",
       "difficulty": "intermediate",
       "sort_order": 40,
-      "estimated_minutes": 40,
+      "estimated_minutes": 105,
       "prerequisites": [
         "go-functions-defer"
       ],
@@ -488,7 +488,7 @@
       "summary": "Объяснять публикацию данных через синхронизацию и пределы race detector.",
       "difficulty": "intermediate",
       "sort_order": 50,
-      "estimated_minutes": 40,
+      "estimated_minutes": 100,
       "prerequisites": [
         "go-types-zero-values",
         "go-maps"
@@ -607,7 +607,7 @@
       "summary": "Выбирать диагностический инструмент по симптому и проверять эффект оптимизации.",
       "difficulty": "intermediate",
       "sort_order": 60,
-      "estimated_minutes": 40,
+      "estimated_minutes": 135,
       "prerequisites": [
         "runtime-gc-budget",
         "runtime-scheduler-gmp"

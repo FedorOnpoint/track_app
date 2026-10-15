@@ -13,7 +13,7 @@
       "summary": "Проектировать события slog, связывать запросы и исключать секреты из диагностических данных.",
       "difficulty": "intermediate",
       "sort_order": 10,
-      "estimated_minutes": 45,
+      "estimated_minutes": 75,
       "prerequisites": [
         "go-errors-panic-recover"
       ],
@@ -131,7 +131,7 @@
       "summary": "Выбирать сигналы состояния API, корректно агрегировать latency и ограничивать число временных рядов.",
       "difficulty": "intermediate",
       "sort_order": 20,
-      "estimated_minutes": 45,
+      "estimated_minutes": 60,
       "prerequisites": [
         "go-types-zero-values"
       ],
@@ -249,7 +249,7 @@
       "summary": "Читать spans распределённого запроса, передавать trace context и понимать ограничения sampling.",
       "difficulty": "intermediate",
       "sort_order": 30,
-      "estimated_minutes": 45,
+      "estimated_minutes": 120,
       "prerequisites": [
         "go-functions-defer"
       ],
@@ -367,7 +367,7 @@
       "summary": "Останавливать Go HTTP сервис с ограниченным drain и отделять жизнь процесса от готовности принимать трафик.",
       "difficulty": "intermediate",
       "sort_order": 40,
-      "estimated_minutes": 45,
+      "estimated_minutes": 105,
       "prerequisites": [
         "go-functions-defer",
         "go-errors-panic-recover"
@@ -486,7 +486,7 @@
       "summary": "Выбирать CPU, heap и goroutine профили по гипотезе и проверять эффект оптимизации.",
       "difficulty": "intermediate",
       "sort_order": 50,
-      "estimated_minutes": 45,
+      "estimated_minutes": 105,
       "prerequisites": [
         "go-arrays-slices"
       ],
@@ -604,7 +604,7 @@
       "summary": "Определять качество сервиса с позиции пользователя и связывать инцидент с измеримым воздействием.",
       "difficulty": "intermediate",
       "sort_order": 60,
-      "estimated_minutes": 45,
+      "estimated_minutes": 75,
       "prerequisites": [
         "go-errors-panic-recover"
       ],

@@ -13,7 +13,7 @@
       "summary": "Проектировать ключи, связи и инварианты данных с учётом NULL и конкурентных записей.",
       "difficulty": "intermediate",
       "sort_order": 10,
-      "estimated_minutes": 40,
+      "estimated_minutes": 75,
       "prerequisites": [],
       "sections": [
         {
@@ -129,7 +129,7 @@
       "summary": "Строить отчёты без потери строк и умножения агрегатов при соединениях.",
       "difficulty": "intermediate",
       "sort_order": 20,
-      "estimated_minutes": 40,
+      "estimated_minutes": 80,
       "prerequisites": [
         "sql-modeling-constraints"
       ],
@@ -247,7 +247,7 @@
       "summary": "Вычислять ранги и накопительные значения, сохраняя отдельные строки.",
       "difficulty": "intermediate",
       "sort_order": 30,
-      "estimated_minutes": 40,
+      "estimated_minutes": 90,
       "prerequisites": [
         "sql-joins-cte"
       ],
@@ -365,7 +365,7 @@
       "summary": "Оценивать план по реальным кардинальностям и цене чтения и записи.",
       "difficulty": "intermediate",
       "sort_order": 40,
-      "estimated_minutes": 40,
+      "estimated_minutes": 120,
       "prerequisites": [
         "sql-joins-cte"
       ],
@@ -483,7 +483,7 @@
       "summary": "Сохранять инварианты при параллельных изменениях и корректно повторять транзакции.",
       "difficulty": "intermediate",
       "sort_order": 50,
-      "estimated_minutes": 40,
+      "estimated_minutes": 135,
       "prerequisites": [
         "sql-modeling-constraints"
       ],
@@ -601,7 +601,7 @@
       "summary": "Управлять lifecycle соединения и развивать схему без нарушения совместимости.",
       "difficulty": "intermediate",
       "sort_order": 60,
-      "estimated_minutes": 40,
+      "estimated_minutes": 120,
       "prerequisites": [
         "sql-transactions-mvcc-locks"
       ],

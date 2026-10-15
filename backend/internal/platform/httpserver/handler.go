@@ -85,7 +85,9 @@ func requestBoundaryMiddleware(config SecurityConfig) func(http.Handler) http.Ha
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			request.Body = http.MaxBytesReader(writer, request.Body, maxRequestBodyBytes)
-			if isSafeMethod(request.Method) {
+			// This namespace is bearer-only and never authenticates using cookies.
+			// Cookie-authenticated routes still require the Origin/Referer check.
+			if isSafeMethod(request.Method) || strings.HasPrefix(request.URL.Path, "/api/v1/agent/") {
 				next.ServeHTTP(writer, request)
 				return
 			}

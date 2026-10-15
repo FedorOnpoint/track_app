@@ -13,7 +13,7 @@
       "summary": "Управлять повторным использованием connections и жизненным циклом HTTP body.",
       "difficulty": "intermediate",
       "sort_order": 10,
-      "estimated_minutes": 40,
+      "estimated_minutes": 90,
       "prerequisites": [
         "interfaces",
         "go-errors-panic-recover"
@@ -132,7 +132,7 @@
       "summary": "Обрабатывать partial reads, EOF и ошибки без неограниченной загрузки input.",
       "difficulty": "intermediate",
       "sort_order": 20,
-      "estimated_minutes": 40,
+      "estimated_minutes": 80,
       "prerequisites": [
         "interfaces",
         "go-arrays-slices",
@@ -252,7 +252,7 @@
       "summary": "Фиксировать версию JSON-контракта и различать absent, null и zero values.",
       "difficulty": "intermediate",
       "sort_order": 30,
-      "estimated_minutes": 40,
+      "estimated_minutes": 105,
       "prerequisites": [
         "go-types-zero-values",
         "go-methods-embedding",
@@ -372,7 +372,7 @@
       "summary": "Различать wall clock, monotonic измерение и календарные интервалы.",
       "difficulty": "intermediate",
       "sort_order": 40,
-      "estimated_minutes": 40,
+      "estimated_minutes": 85,
       "prerequisites": [
         "go-types-zero-values"
       ],
@@ -490,7 +490,7 @@
       "summary": "Различать DB handle и connection, закрывать Rows и сохранять transactional boundary.",
       "difficulty": "intermediate",
       "sort_order": 50,
-      "estimated_minutes": 40,
+      "estimated_minutes": 100,
       "prerequisites": [
         "go-errors-panic-recover",
         "interfaces"
@@ -609,7 +609,7 @@
       "summary": "Выбирать capability для файлов и проверять lifecycle через testing и временные directories.",
       "difficulty": "intermediate",
       "sort_order": 60,
-      "estimated_minutes": 40,
+      "estimated_minutes": 65,
       "prerequisites": [
         "interfaces",
         "go-errors-panic-recover"

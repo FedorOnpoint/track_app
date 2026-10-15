@@ -13,7 +13,7 @@
       "summary": "Понимать lifecycle серверного процесса и границы доступа к файлам и ресурсам.",
       "difficulty": "intermediate",
       "sort_order": 10,
-      "estimated_minutes": 40,
+      "estimated_minutes": 85,
       "prerequisites": [
         "go-functions-defer"
       ],
@@ -131,7 +131,7 @@
       "summary": "Разделять разрешение имени, установление соединения и протокольный ответ сервиса.",
       "difficulty": "intermediate",
       "sort_order": 20,
-      "estimated_minutes": 40,
+      "estimated_minutes": 90,
       "prerequisites": [
         "infra-linux-processes-signals"
       ],
@@ -249,7 +249,7 @@
       "summary": "Собирать воспроизводимый образ и отделять runtime state от filesystem контейнера.",
       "difficulty": "intermediate",
       "sort_order": 30,
-      "estimated_minutes": 40,
+      "estimated_minutes": 120,
       "prerequisites": [
         "infra-network-dns"
       ],
@@ -367,7 +367,7 @@
       "summary": "Понимать snapshot model и отделять локальные изменения от опубликованной истории.",
       "difficulty": "intermediate",
       "sort_order": 40,
-      "estimated_minutes": 40,
+      "estimated_minutes": 60,
       "prerequisites": [],
       "sections": [
         {
@@ -483,7 +483,7 @@
       "summary": "Проверять настройки при запуске и не смешивать публичные параметры с чувствительными данными.",
       "difficulty": "intermediate",
       "sort_order": 50,
-      "estimated_minutes": 40,
+      "estimated_minutes": 75,
       "prerequisites": [
         "go-errors-panic-recover"
       ],
@@ -601,7 +601,7 @@
       "summary": "Связывать проверенный исходный код с поставляемым образом и понимать границы автоматизации.",
       "difficulty": "intermediate",
       "sort_order": 60,
-      "estimated_minutes": 40,
+      "estimated_minutes": 150,
       "prerequisites": [
         "infra-docker-images-compose",
         "infra-git-workflow",

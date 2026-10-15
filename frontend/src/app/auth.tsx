@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createContext, type FormEvent, type ReactNode, useContext, useEffect, useState } from 'react'
-import { Navigate, Outlet, useLocation, useNavigate } from 'react-router'
+import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router'
 
 import { ApiError, apiRequest, unauthorizedEvent } from '../shared/api/client'
 import type { ApiEnvelope } from '../shared/api/types'
@@ -104,7 +104,7 @@ export function LoginPage() {
 
   return <main className="login-page">
     <section className="login-aside"><a className="brand login-brand" href="/"><span className="brand-mark">Go</span><span>Interview</span></a><div><p className="eyebrow">Middle Go Backend</p><h2>Готовьтесь<br />системно.</h2><p>Теория, вопросы и практика — в одном персональном треке.</p></div><span className="login-note">Локальное пространство подготовки</span></section>
-    <section className="login-panel"><form className="login-form" onSubmit={submitLogin}><p className="eyebrow">Защищённый доступ</p><h1>С возвращением</h1><p>Войдите, чтобы продолжить с того места, где остановились.</p><label>Логин<input autoComplete="username" value={login} onChange={(event) => setLogin(event.target.value)} required /></label><label>Пароль<input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={12} required /></label>{mutation.isError && <div className="login-error" role="alert">Неверный логин или пароль</div>}<button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Входим…' : 'Войти'}</button></form></section>
+    <section className="login-panel"><form className="login-form" onSubmit={submitLogin}><p className="eyebrow">Защищённый доступ</p><h1>С возвращением</h1><p>Войдите, чтобы продолжить с того места, где остановились.</p><label>Логин<input autoComplete="username" value={login} onChange={(event) => setLogin(event.target.value)} required /></label><label>Пароль<input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={12} required /></label>{mutation.isError && <div className="login-error" role="alert">Неверный логин или пароль</div>}<button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Входим…' : 'Войти'}</button><p className="auth-switch">Есть приглашение? <Link to="/register">Создать аккаунт</Link></p></form></section>
   </main>
 }
 

@@ -13,7 +13,7 @@
       "summary": "Выделять пользовательский сценарий, инварианты и ограничения до выбора технологий.",
       "difficulty": "intermediate",
       "sort_order": 10,
-      "estimated_minutes": 45,
+      "estimated_minutes": 35,
       "prerequisites": [
         "go-types-zero-values"
       ],
@@ -131,7 +131,7 @@
       "summary": "Строить объяснение от задачи к механизму, показывать свой вклад и проверяемый результат.",
       "difficulty": "intermediate",
       "sort_order": 20,
-      "estimated_minutes": 45,
+      "estimated_minutes": 40,
       "prerequisites": [
         "interfaces"
       ],
@@ -368,7 +368,7 @@
       "summary": "Честно обозначать границы знаний, рассуждать по фактам и предлагать безопасную проверку.",
       "difficulty": "intermediate",
       "sort_order": 40,
-      "estimated_minutes": 45,
+      "estimated_minutes": 50,
       "prerequisites": [
         "go-errors-panic-recover"
       ],
@@ -486,7 +486,7 @@
       "summary": "Объяснять impact, timeline, mitigation и системные улучшения без обвинений и выдуманного опыта.",
       "difficulty": "intermediate",
       "sort_order": 50,
-      "estimated_minutes": 45,
+      "estimated_minutes": 75,
       "prerequisites": [
         "go-errors-panic-recover"
       ],
@@ -604,7 +604,7 @@
       "summary": "Формулировать замечания через риск и проверку, отделять обязательное исправление от предпочтения.",
       "difficulty": "intermediate",
       "sort_order": 60,
-      "estimated_minutes": 45,
+      "estimated_minutes": 55,
       "prerequisites": [
         "go-functions-defer",
         "interfaces"

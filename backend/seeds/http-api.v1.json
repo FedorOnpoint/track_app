@@ -13,7 +13,7 @@
       "summary": "Связывать semantics методов с ресурсами, retries и наблюдаемым response contract.",
       "difficulty": "intermediate",
       "sort_order": 10,
-      "estimated_minutes": 40,
+      "estimated_minutes": 60,
       "prerequisites": [
         "go-errors-panic-recover"
       ],
@@ -131,7 +131,7 @@
       "summary": "Собирать cross-cutting обработку в предсказуемом порядке без потери HTTP capabilities.",
       "difficulty": "intermediate",
       "sort_order": 20,
-      "estimated_minutes": 40,
+      "estimated_minutes": 105,
       "prerequisites": [
         "interfaces",
         "go-functions-defer"
@@ -250,7 +250,7 @@
       "summary": "Разделять parsing, structural и business validation с безопасной классификацией ошибок.",
       "difficulty": "intermediate",
       "sort_order": 30,
-      "estimated_minutes": 40,
+      "estimated_minutes": 90,
       "prerequisites": [
         "go-errors-panic-recover",
         "go-types-zero-values"
@@ -369,7 +369,7 @@
       "summary": "Обрабатывать неизвестный результат side effect через deduplication и общий retry budget.",
       "difficulty": "intermediate",
       "sort_order": 40,
-      "estimated_minutes": 40,
+      "estimated_minutes": 135,
       "prerequisites": [
         "go-errors-panic-recover",
         "go-maps"
@@ -488,7 +488,7 @@
       "summary": "Задавать детерминированные страницы и менять API без неожиданных semantic breaks.",
       "difficulty": "intermediate",
       "sort_order": 50,
-      "estimated_minutes": 40,
+      "estimated_minutes": 120,
       "prerequisites": [
         "go-maps",
         "go-types-zero-values"
@@ -607,7 +607,7 @@
       "summary": "Ограничивать время и нагрузку на каждом network этапе с пониманием net/http semantics.",
       "difficulty": "intermediate",
       "sort_order": 60,
-      "estimated_minutes": 40,
+      "estimated_minutes": 120,
       "prerequisites": [
         "go-errors-panic-recover",
         "go-types-zero-values"

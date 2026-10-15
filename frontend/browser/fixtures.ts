@@ -19,7 +19,7 @@ export const test = base.extend<{ mockAPI: void }>({
     await page.route('**/api/v1/**', async route => {
       const path = new URL(route.request().url()).pathname
       const note = { id: 'n1', topic_id: 't1', topic_slug: 'goroutines', topic_title: topic.title, body_markdown: 'Проверить отмену через context.', created_at: '2026-10-07T00:00:00Z', updated_at: '2026-10-07T00:00:00Z' }
-      if (path.endsWith('/auth/me')) return route.fulfill({ status: new URL(page.url()).pathname === '/login' ? 401 : 200, json: { data: { id: 'u1', login: 'fedor' } } })
+      if (path.endsWith('/auth/me')) return route.fulfill({ status: ['/login', '/register'].includes(new URL(page.url()).pathname) ? 401 : 200, json: { data: { id: 'u1', login: 'fedor' } } })
       if (path.endsWith('/dashboard')) return route.fulfill({ json: { data: { overall: { total: 12, mastered: 5, percent: 42 }, categories: [{ slug: 'concurrency', title: 'Конкурентность', total: 4, mastered: 2, percent: 50 }], review_topics: [topic], recent_topics: [topic], recent_notes: [note], continue_topic: topic } } })
       if (path.endsWith('/categories')) return route.fulfill({ json: { data: [{ id: 'cat1', slug: 'concurrency', title: 'Конкурентность', description: 'Горутины и каналы' }] } })
       if (path.endsWith('/topics/goroutines')) return route.fulfill({ json: { data: topic } })

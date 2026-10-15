@@ -5,6 +5,7 @@ import { DashboardPage } from '../pages/DashboardPage'
 import { TopicPage } from '../pages/TopicPage'
 import { TopicListPage } from '../pages/TopicListPage'
 import { SettingsPage } from '../pages/SettingsPage'
+import { RegisterPage } from '../pages/RegisterPage'
 import { AuthLayout, LoginPage, ProtectedRoute } from './auth'
 import { AppLayout } from './layout'
 
@@ -16,6 +17,7 @@ export const appRoutes: RouteObject[] = [{
   Component: AuthLayout,
   children: [
     { path: '/login', Component: LoginPage },
+    { path: '/register', Component: RegisterPage },
     {
       Component: ProtectedRoute,
       children: [{

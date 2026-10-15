@@ -13,7 +13,7 @@
       "summary": "Различать определённые типы и aliases, понимать нулевые значения, копирование и явные преобразования.",
       "difficulty": "basic",
       "sort_order": 10,
-      "estimated_minutes": 35,
+      "estimated_minutes": 45,
       "prerequisites": [],
       "sections": [
         {
@@ -129,7 +129,7 @@
       "summary": "Разобрать длину, ёмкость, общий backing array и последствия append для владения данными.",
       "difficulty": "intermediate",
       "sort_order": 20,
-      "estimated_minutes": 35,
+      "estimated_minutes": 75,
       "prerequisites": [
         "go-types-zero-values"
       ],
@@ -247,7 +247,7 @@
       "summary": "Учитывать comparable keys, comma-ok, общую map и отсутствие гарантированного порядка обхода.",
       "difficulty": "intermediate",
       "sort_order": 30,
-      "estimated_minutes": 35,
+      "estimated_minutes": 50,
       "prerequisites": [
         "go-types-zero-values"
       ],
@@ -372,7 +372,7 @@
       "summary": "Отличать байтовую длину от числа Unicode code points и не разрезать UTF-8 по случайной границе.",
       "difficulty": "basic",
       "sort_order": 40,
-      "estimated_minutes": 35,
+      "estimated_minutes": 60,
       "prerequisites": [
         "go-types-zero-values",
         "go-arrays-slices"
@@ -491,7 +491,7 @@
       "summary": "Понимать копирование параметров, захваченные переменные, variadic slices и порядок отложенных вызовов.",
       "difficulty": "intermediate",
       "sort_order": 50,
-      "estimated_minutes": 35,
+      "estimated_minutes": 75,
       "prerequisites": [
         "go-types-zero-values",
         "go-arrays-slices"
@@ -610,7 +610,7 @@
       "summary": "Различать method sets T и *T, понимать promotion и выбирать receiver по семантике владения.",
       "difficulty": "intermediate",
       "sort_order": 60,
-      "estimated_minutes": 35,
+      "estimated_minutes": 70,
       "prerequisites": [
         "go-types-zero-values",
         "go-functions-defer"
@@ -729,7 +729,7 @@
       "summary": "Неявная реализация, nil-интерфейсы и небольшие контракты у потребителя.",
       "difficulty": "intermediate",
       "sort_order": 70,
-      "estimated_minutes": 35,
+      "estimated_minutes": 80,
       "prerequisites": [
         "go-methods-embedding"
       ],
@@ -847,7 +847,7 @@
       "summary": "Сохранять причины ошибок через wrapping, проверять цепочку и отличать ожидаемый отказ от нарушения инварианта.",
       "difficulty": "intermediate",
       "sort_order": 80,
-      "estimated_minutes": 35,
+      "estimated_minutes": 75,
       "prerequisites": [
         "interfaces",
         "go-functions-defer"
@@ -973,7 +973,7 @@
       "summary": "Использовать параметры типов для повторяемых алгоритмов и не путать constraint с интерфейсом поведения.",
       "difficulty": "intermediate",
       "sort_order": 90,
-      "estimated_minutes": 35,
+      "estimated_minutes": 90,
       "prerequisites": [
         "interfaces",
         "go-arrays-slices"
@@ -1092,7 +1092,7 @@
       "summary": "Разделять package и module, понимать export, internal, go.mod, go.sum и воспроизводимый граф зависимостей.",
       "difficulty": "intermediate",
       "sort_order": 100,
-      "estimated_minutes": 35,
+      "estimated_minutes": 65,
       "prerequisites": [
         "go-functions-defer",
         "interfaces"

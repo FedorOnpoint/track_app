@@ -53,6 +53,10 @@ build-frontend:
 
 .PHONY: migrate migrate-up docker-build seed-catalog test-operations e2e smoke cd-dry-run
 
+.PHONY: invite
+invite:
+	cd backend && $(GO) run ./cmd/invite
+
 migrate:
 	cd backend && MIGRATIONS_DIR=migrations $(GO) run ./cmd/migrate
 

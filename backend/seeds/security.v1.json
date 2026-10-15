@@ -13,7 +13,7 @@
       "summary": "Разделять проверку личности и права на действие, проектировать deny by default и проверять владение объектом.",
       "difficulty": "intermediate",
       "sort_order": 10,
-      "estimated_minutes": 45,
+      "estimated_minutes": 75,
       "prerequisites": [
         "interfaces"
       ],
@@ -131,7 +131,7 @@
       "summary": "Понимать Argon2id, выбор стоимости, salt, миграцию параметров и ресурсные границы аутентификации.",
       "difficulty": "intermediate",
       "sort_order": 20,
-      "estimated_minutes": 45,
+      "estimated_minutes": 100,
       "prerequisites": [
         "go-types-zero-values",
         "go-errors-panic-recover"
@@ -250,7 +250,7 @@
       "summary": "Проектировать lifecycle opaque session, атрибуты cookie и независимую защиту изменяющих запросов.",
       "difficulty": "intermediate",
       "sort_order": 30,
-      "estimated_minutes": 45,
+      "estimated_minutes": 120,
       "prerequisites": [
         "go-types-zero-values"
       ],
@@ -389,7 +389,7 @@
       "summary": "Отделять значения от SQL синтаксиса и безопасно строить динамические фильтры и сортировку.",
       "difficulty": "intermediate",
       "sort_order": 40,
-      "estimated_minutes": 45,
+      "estimated_minutes": 65,
       "prerequisites": [
         "go-strings"
       ],
@@ -507,7 +507,7 @@
       "summary": "Ограничивать доверие к URL, redirects и DNS при обращении сервера к внешним ресурсам.",
       "difficulty": "intermediate",
       "sort_order": 50,
-      "estimated_minutes": 45,
+      "estimated_minutes": 120,
       "prerequisites": [
         "go-strings",
         "go-errors-panic-recover"
@@ -626,7 +626,7 @@
       "summary": "Разделять защиту канала и жизненный цикл credentials, понимать termination и ротацию.",
       "difficulty": "intermediate",
       "sort_order": 60,
-      "estimated_minutes": 45,
+      "estimated_minutes": 90,
       "prerequisites": [
         "go-packages-modules"
       ],

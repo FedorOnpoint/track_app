@@ -38,6 +38,10 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .login-aside .eyebrow { color:#9ad3b8; } .login-note { color:#9fb7ac; font-size:11px; text-transform:uppercase; letter-spacing:.12em; }
 .login-panel { display:grid; place-items:center; padding:40px; }
 .login-form { width:min(420px,100%); display:grid; gap:20px; }
+.registration-form { gap:14px; padding-block:16px; }
+.field-hint { margin-top:-6px; color:var(--muted); font-size:12px; line-height:1.5; font-weight:400; }
+.login-form .auth-switch { margin:4px 0 0; text-align:center; font-size:14px; color:var(--muted); }
+.auth-switch a { color:var(--accent); text-decoration:underline; text-underline-offset:3px; font-weight:600; }
 .login-form h1 { margin:0; font:600 44px 'Source Serif 4',serif; letter-spacing:-.03em; } .login-form>p:not(.eyebrow) { color:var(--muted); line-height:1.6; margin-bottom:10px; }
 .login-form label { display:grid; gap:8px; color:#49534e; font-size:12px; font-weight:700; }
 .login-form input { height:50px; padding:0 14px; border:1px solid #c7d6cb; border-radius:8px; background:white; color:var(--ink); }

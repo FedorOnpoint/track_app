@@ -18,6 +18,7 @@ type Handler struct {
 	service      *Service
 	secureCookie bool
 	limiter      *RateLimiter
+	registration *RegistrationService
 }
 
 func NewHandler(service *Service, secureCookie bool) *Handler {
@@ -25,11 +26,57 @@ func NewHandler(service *Service, secureCookie bool) *Handler {
 }
 
 func (handler *Handler) Mount(router chi.Router) {
+	if handler.registration != nil {
+		router.Post("/auth/register", handler.register)
+	}
 	router.Post("/auth/login", handler.login)
 	router.Post("/auth/logout", handler.logout)
 	router.With(handler.Require).Post("/auth/logout-all", handler.logoutAll)
 	router.With(handler.Require).Put("/auth/password", handler.changePassword)
 	router.With(handler.Require).Get("/auth/me", handler.me)
+}
+
+func (handler *Handler) WithRegistration(service *RegistrationService) *Handler {
+	handler.registration = service
+	return handler
+}
+
+func (handler *Handler) register(writer http.ResponseWriter, request *http.Request) {
+	if !handler.limiter.Allow(clientIP(request), time.Now()) {
+		writer.Header().Set("Retry-After", "900")
+		writeAuthError(writer, request, http.StatusTooManyRequests, "rate_limited", "Слишком много попыток. Попробуйте через 15 минут")
+		return
+	}
+	var input struct {
+		Login          string `json:"login"`
+		Password       string `json:"password"`
+		InvitationCode string `json:"invitation_code"`
+	}
+	if !decodeAuthJSON(writer, request, &input) {
+		writeAuthError(writer, request, http.StatusBadRequest, "validation_error", "Проверьте введённые данные")
+		return
+	}
+	result, err := handler.registration.Register(request.Context(), input.Login, input.Password, input.InvitationCode, time.Now())
+	if err != nil {
+		switch err {
+		case ErrInvalidLogin:
+			writeAuthError(writer, request, http.StatusBadRequest, "validation_error", "Логин: 3–64 символа, строчные латинские буквы, цифры, точка, дефис или подчёркивание")
+		case ErrInvalidPassword:
+			writeAuthError(writer, request, http.StatusBadRequest, "validation_error", "Пароль должен содержать от 12 до 1024 байт")
+		case ErrInvalidInvitation:
+			writeAuthError(writer, request, http.StatusBadRequest, "invalid_invitation", "Код приглашения неверен, истёк или уже использован")
+		case ErrLoginUnavailable:
+			writeAuthError(writer, request, http.StatusConflict, "login_unavailable", "Этот логин уже занят. Выберите другой")
+		case ErrRegistrationRateLimited:
+			writer.Header().Set("Retry-After", "900")
+			writeAuthError(writer, request, http.StatusTooManyRequests, "rate_limited", "Слишком много попыток. Попробуйте через 15 минут")
+		default:
+			writeAuthError(writer, request, http.StatusInternalServerError, "internal_error", "Не удалось создать аккаунт. Попробуйте ещё раз")
+		}
+		return
+	}
+	http.SetCookie(writer, &http.Cookie{Name: sessionCookieName, Value: result.Token, Path: "/", HttpOnly: true, Secure: handler.secureCookie, SameSite: http.SameSiteLaxMode, MaxAge: int(handler.service.ttl.Seconds())})
+	writeAuthJSON(writer, http.StatusCreated, map[string]any{"data": map[string]any{"id": result.User.ID.String(), "login": result.User.Login}})
 }
 
 func (handler *Handler) Require(next http.Handler) http.Handler {
