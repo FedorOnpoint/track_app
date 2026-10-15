@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, type PointerEvent, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 
 import { apiRequest } from './shared/api/client'
@@ -79,7 +79,7 @@ export function App() {
           {loading && <div className="state"><span className="loader" />Загружаем карту знаний…</div>}
           {error && <div className="state error" role="alert"><strong>Не удалось загрузить каталог</strong><span>Проверьте, запущен ли API, и попробуйте ещё раз.</span><button type="button" onClick={() => { void categoriesQuery.refetch(); void topicsQuery.refetch() }}>Повторить</button></div>}
           {!loading && !error && topics.length === 0 && <div className="state"><strong>Темы не найдены</strong><span>Измените поиск или сбросьте фильтры.</span><button type="button" onClick={() => { setSearchDraft(''); setSearchParams({}) }}>Сбросить фильтры</button></div>}
-          {!loading && !error && topics.length > 0 && <><ol className="topic-list">{topics.map((topic, index) => <li key={topic.id}><Link className="topic-card" to={`/topics/${topic.slug}`}><span className="topic-number">{String((pagination.page - 1) * pagination.page_size + index + 1).padStart(2, '0')}</span><span className="topic-copy"><span className="topic-meta"><span>{topic.category_title}</span><span className={`difficulty ${topic.difficulty}`}>{difficultyLabel[topic.difficulty]}</span></span><strong>{topic.title}</strong><span>{topic.summary}</span></span><span className="topic-time"><strong>{topic.estimated_minutes}</strong><span>мин</span></span><span className="topic-arrow" aria-hidden="true">→</span></Link></li>)}</ol><nav className="pagination" aria-label="Страницы каталога"><button type="button" disabled={pagination.page <= 1} onClick={() => updateFilters({ page: String(pagination.page - 1) })}>Назад</button><span>Страница {pagination.page} из {pagination.total_pages}</span><button type="button" disabled={pagination.page >= pagination.total_pages} onClick={() => updateFilters({ page: String(pagination.page + 1) })}>Далее</button></nav></>}
+          {!loading && !error && topics.length > 0 && <><ol className="topic-list">{topics.map((topic, index) => <li key={topic.id}><Link className="topic-card" onPointerMove={tiltTopic} onPointerLeave={resetTopicTilt} onPointerCancel={resetTopicTilt} to={`/topics/${topic.slug}`}><span className="topic-number">{String((pagination.page - 1) * pagination.page_size + index + 1).padStart(2, '0')}</span><span className="topic-copy"><span className="topic-meta"><span>{topic.category_title}</span><span className={`difficulty ${topic.difficulty}`}>{difficultyLabel[topic.difficulty]}</span></span><strong>{topic.title}</strong><span>{topic.summary}</span></span><span className="topic-time"><strong>{topic.estimated_minutes}</strong><span>мин</span></span><span className="topic-arrow" aria-hidden="true">→</span></Link></li>)}</ol><nav className="pagination" aria-label="Страницы каталога"><button type="button" disabled={pagination.page <= 1} onClick={() => updateFilters({ page: String(pagination.page - 1) })}>Назад</button><span>Страница {pagination.page} из {pagination.total_pages}</span><button type="button" disabled={pagination.page >= pagination.total_pages} onClick={() => updateFilters({ page: String(pagination.page + 1) })}>Далее</button></nav></>}
         </section>
       </div>
   </main>
@@ -96,4 +96,22 @@ function topicWord(count: number) {
   if (mod10 === 1) return 'тема'
   if (mod10 >= 2 && mod10 <= 4) return 'темы'
   return 'тем'
+}
+
+function resetTopicTilt(event: PointerEvent<HTMLAnchorElement>) {
+  event.currentTarget.style.removeProperty('--tilt-x')
+  event.currentTarget.style.removeProperty('--tilt-y')
+}
+
+function tiltTopic(event: PointerEvent<HTMLAnchorElement>) {
+  if (event.pointerType !== 'mouse' || !window.matchMedia('(hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)').matches) {
+    resetTopicTilt(event)
+    return
+  }
+  // Measure the stationary list item to avoid feedback from the card's transform.
+  const bounds = event.currentTarget.parentElement!.getBoundingClientRect()
+  const x = Math.max(-1, Math.min(1, (event.clientX - bounds.left) / bounds.width * 2 - 1))
+  const y = Math.max(-1, Math.min(1, (event.clientY - bounds.top) / bounds.height * 2 - 1))
+  event.currentTarget.style.setProperty('--tilt-x', `${-y * 2}deg`)
+  event.currentTarget.style.setProperty('--tilt-y', `${x * 0.8}deg`)
 }
